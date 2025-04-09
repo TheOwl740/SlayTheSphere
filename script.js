@@ -7,14 +7,12 @@ function update() {
       updateHomescreen()
       break;
     case "loading":
-      //instantiate objects
-      currentLevel = new Level();
-      player = new Player();
-      //start game
-      gameState = "inGame";
+      loadNewLevel();
       break;
     case "inGame":
-      renderAll();
+      updateGame();
+      renderGame();
+      updateCamera();
       break;
   }
 }
