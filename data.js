@@ -139,7 +139,7 @@ class Level {
       //prepare for check
       checkFailed = false;
       //cycle through x tiles within dimensions + 1 so walls are on outside of room
-      for(let i = (dimensions.x + 3) / -2; i <= (dimensions.x + 3) / 2; i++) {
+      for(let i = (dimensions.x + 3 ) / -2; i <= (dimensions.x + 3) / 2; i++) {
         //cycle through y tiles similarly
         for(let ii = (dimensions.y + 3) / -2; ii <= (dimensions.y + 3) / 2; ii++) {
           //if a room is present (floor detected), fail the check and break first loop
@@ -163,16 +163,74 @@ class Level {
             this.map[checkIndex.x + i][checkIndex.y + ii] = new Floor(this.map[checkIndex.x + i][checkIndex.y + ii].transform, this);
           }
         }
-        //add sphere to room if it is the first generated
-        switch(rooms.length) {
-          //add sphere
-          case 1:
-            this.enemies.push(new Sphere(this.map[checkIndex.x][checkIndex.y].transform));
-            break;
-          //add player spawn
-          case 2:
-            this.playerSpawn = this.map[checkIndex.x][checkIndex.y].transform;
-            break;
+      }
+    }
+    //variables to hold most distant
+    let mostDistance = 0;
+    let mostDistant = new Pair(0, 1);
+    //find most distant pair of rooms
+    for(let i = 0; i < rooms.length; i++) {
+      for(let ii = 0; ii < rooms.length; ii++) {
+        let currentDist = tk.calcDistance(this.map[rooms[i].x][rooms[i].y].transform, this.map[rooms[ii].x][rooms[ii].y].transform)
+        if(currentDist > mostDistance) {
+          mostDistance = currentDist;
+          mostDistant.x = i;
+          mostDistant.y = ii;
+        }
+      }
+    }
+    this.playerSpawn = this.map[rooms[mostDistant.x].x][rooms[mostDistant.x].y].transform;
+    this.sphere = new Sphere(this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y].transform)
+    //currentIndex pair to track current map matrix index
+    let currentIndex = rooms[0].duplicate();
+    //currentTarget pair which tracks the current carve target for first step
+    let currentTarget = null;
+    //start carving between rooms
+    for(let i = 1; i < rooms.length; i++) {
+      //set the current target to the end of the first leg
+      if(this.map[currentIndex.x, rooms[i].y].type === "floor") {
+        currentTarget = new Pair(rooms[i].x, currentIndex.y);
+      } else {
+        currentTarget = new Pair(currentIndex.x, rooms[i].y);
+      }
+      //move towards target
+      while(currentIndex.x !== currentTarget.x || currentIndex.y !== currentTarget.y) {
+        //move on x axis
+        if(currentIndex.x < currentTarget.x) {
+          currentIndex.x++;
+        } else if(currentIndex.x > currentTarget.x) {
+          currentIndex.x--;
+        }
+        //move on y axis
+        if(currentIndex.y < currentTarget.y) {
+          currentIndex.y++;
+        } else if(currentIndex.y > currentTarget.y) {
+          currentIndex.y--;
+        }
+        //insert floors
+        if(this.map[currentIndex.x][currentIndex.y].type === "wall") {
+          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform);
+        }
+      }
+      //reset currentTarget to next room
+      currentTarget = rooms[i];
+      //move towards next room on second leg
+      while(currentIndex.x !== currentTarget.x || currentIndex.y !== currentTarget.y) {
+        //move on x axis
+        if(currentIndex.x < currentTarget.x) {
+          currentIndex.x++;
+        } else if(currentIndex.x > currentTarget.x) {
+          currentIndex.x--;
+        }
+        //move on y axis
+        if(currentIndex.y < currentTarget.y) {
+          currentIndex.y++;
+        } else if(currentIndex.y > currentTarget.y) {
+          currentIndex.y--;
+        }
+        //insert floors
+        if(this.map[currentIndex.x][currentIndex.y].type === "wall") {
+          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform);
         }
       }
     }
@@ -184,6 +242,7 @@ class Level {
     for(let i = 0; i < this.enemies.length; i++) {
       this.enemies[i].render();
     }
+    this.sphere.render();
   }
 }
 
