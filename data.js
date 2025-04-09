@@ -20,12 +20,95 @@ let gameState = "homescreen";
 let currentLevel = null;
 //player object or null when loading
 let player = null;
+//turn controller object
+let currentTC = null;
 //landscape bool for multiplatform rendering
 const landscape = cs.w > cs.h ? true : false;
 //tilesize for rendering tiles
-const tileSize = Math.floor(landscape ? cs.w / 30 : cs.h / 30);
+const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 25);
 
 //CLASSES
+//turn controller class
+class TurnController {
+  constructor() {
+    this.turn = 0;
+    this.turnOrder = [];
+  }
+  //adds a new entity to the turn order
+  add(entity) {
+    this.turnOrder.push(entity)
+    this.turnOrder.sort((a, b) => {
+      return a.nextTurn - b.nextTurn;
+    });
+  }
+  //initialises starting enemies and player on new level
+  initialize() {
+    player.nextTurn = 0;
+    this.turnOrder.push(player);
+    currentLevel.enemies.forEach((enemy) => {
+      this.turnOrder.push(enemy);
+    });
+    this.turnOrder.sort((a, b) => {
+      return a.nextTurn - b.nextTurn;
+    });
+  }
+  //updates the turn order and runs actions
+  update() {
+    //if no actions to be done
+    if(this.currentAction === null) {
+      //hold an action object or null placeholder
+      let returnAction = this.turnOrder[0].runTurn();
+      //if action object is ready
+      if(returnAction !== null) {
+        //set as current action
+        this.currentAction = returnAction;
+        //increase next turn of entity by action turn increase
+        this.turnOrder[0].nextTurn += returnAction.turnIncrease;
+        //re-sort
+        this.turnOrder.sort((a, b) => {
+          return a.nextTurn - b.nextTurn;
+        });
+      }
+    //if action needs completed
+    } else {
+      this.currentAction.update();
+      this.currentAction.remainingDuration--;
+      if(this.currentAction.remainingDuration <= 0) {
+        this.currentAction = null;
+      }
+    }
+  }
+}
+//action class for player and entity actions sent to turn manager
+class Action {
+  constructor(actor, turnIncrease, duration) {
+    this.actor = actor;
+    this.turnIncrease = turnIncrease;
+    this.duration = duration;
+    this.remainingDuration = duration;
+  }
+}
+//move action subclass
+class Move extends Action {
+  constructor(actor, targetTile) {
+    super(actor, actor.moveTime, 30);
+    this.type = "move";
+    this.targetTile = targetTile;
+  }
+  update() {
+    
+  }
+}
+class Attack extends Action {
+  constructor(actor, targetEntity) {
+    super(actor, actor.attackSpeed, 30);
+    this.type = "attack";
+    this.targetEntity = targetEntity;
+  }
+  update() {
+
+  }
+}
 //player class
 class Player {
   constructor(transform) {
@@ -36,6 +119,7 @@ class Player {
       tk.calcRotationalTranslate(240, tileSize / 3)
     ], 0);
     this.fill = new Fill("#6262e7", 1);
+    this.nextTurn = 0;
   }
   collider() {
     return new Collider(player.transform, player.shape);
@@ -43,8 +127,8 @@ class Player {
   render() {
     rt.renderShape(this.transform, this.shape, this.fill, null);
   }
-  update() {
-    this.shape.r = tk.calcAngle(this.transform, et.dCursor(rt));
+  runTurn() {
+    return null;
   }
 }
 //general enemy class
@@ -68,6 +152,20 @@ class Sphere extends Enemy {
     rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.5 * sinMultiplier.y), null);
   }
 }
+class Cube extends Enemy {
+  constructor(transform) {
+    super(transform, new Rectangle(0, tileSize * 0.75, tileSize * 0.75));
+    this.fill = new Fill("#f94f01", 1);
+    this.nextTurn = currentTC.turn + 1;
+  }
+  render() {
+    let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
+    rt.renderRectangle(this.transform, new Rectangle(0, this.shape.w * (sinMultiplier.x ** 0.3), this.shape.h * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.5 * sinMultiplier.x), null);
+  }
+  runTurn() {
+    return null;
+  }
+}
 class Tile {
   constructor(transform, level) {
     this.transform = transform;
@@ -80,13 +178,14 @@ class Wall extends Tile {
     super(transform, level);
     this.type = "wall"
     this.fill = new Fill("#171717", 1);
+    this.border = new Border("#000000", 1, 0.5, "butt");
     this.shape = new Rectangle(0, tileSize, tileSize);
   }
   collider() {
     return new Collider(this.transform, this.shape);
   }
   render() {
-    rt.renderRectangle(this.transform, this.shape, this.fill, null);
+    rt.renderRectangle(this.transform, this.shape, this.fill, this.border);
   }
 }
 //floor tile subclass
@@ -95,13 +194,14 @@ class Floor extends Tile {
     super(transform, level);
     this.type = "floor"
     this.fill = new Fill("#343434", 1);
+    this.border = new Border("#000000", 1, 0.5, "butt");
     this.shape = new Rectangle(0, tileSize, tileSize);
   }
   collider() {
     return new Collider(this.transform, this.shape);
   }
   render() {
-    rt.renderRectangle(this.transform, this.shape, this.fill, null);
+    rt.renderRectangle(this.transform, this.shape, this.fill, this.border);
   }
 }
 //map and level dependents class
@@ -247,19 +347,16 @@ class Level {
 }
 
 //FUNCTIONS
-//renders everything during game
-function renderGame() {
+//renders everything during game and updates turns and controls
+function updateGame() {
+  //update turn control
+  currentTC.update();
   //canvas clear
   cs.fillAll(new Fill("#000000", 1));
   //render map
   currentLevel.render();
   //render player
   player.render();
-}
-//updates all updatables during game
-function updateGame() {
-  //update player
-  player.update()
 }
 //renders and updates button on homescreen
 function updateHomescreen() {
@@ -291,13 +388,15 @@ function updateCamera() {
     if(et.getKey("s")) {
       rt.camera.y -= 10;
     }
-  //in regular camera mode
+  //in player locked mode
   } else {
     rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2))
   }
 }
 //loads next level
 function loadNewLevel() {
+  //create new turn controller
+  currentTC = new TurnController();
   //instantiate and generate new level
   currentLevel = new Level();
   //create new or apply transform to existing player
@@ -308,6 +407,8 @@ function loadNewLevel() {
   }
   //increment level counter
   levelCount++;
+  //initialize turn controller data
+  currentTC.initialize();
   //start game
   gameState = "inGame";
 }

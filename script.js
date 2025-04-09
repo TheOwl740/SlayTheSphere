@@ -11,7 +11,6 @@ function update() {
       break;
     case "inGame":
       updateGame();
-      renderGame();
       updateCamera();
       break;
   }
