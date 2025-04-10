@@ -25,7 +25,7 @@ let currentTC = null;
 //landscape bool for multiplatform rendering
 const landscape = cs.w > cs.h ? true : false;
 //tilesize for rendering tiles
-const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 25);
+const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 15);
 
 //CLASSES
 //turn controller class
@@ -198,7 +198,7 @@ class Wall extends Tile {
     super(transform, level);
     this.type = "wall"
     this.fill = new Fill("#171717", 1);
-    this.border = new Border("#000000", 1, 0.5, "butt");
+    this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
     this.shape = new Rectangle(0, tileSize, tileSize);
   }
   collider() {
@@ -214,7 +214,7 @@ class Floor extends Tile {
     super(transform, level);
     this.type = "floor"
     this.fill = new Fill("#343434", 1);
-    this.border = new Border("#000000", 1, 0.5, "butt");
+    this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
     this.shape = new Rectangle(0, tileSize, tileSize);
   }
   collider() {
@@ -391,10 +391,10 @@ function updateHomescreen() {
   //canvas clear
   cs.fillAll(new Fill("#000000", 1));
   //rendering
-  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle((cs.w / 2) * (((Math.sin(ec / 50) + 1) / 8) + 1)), new Fill("#e0a204", (Math.sin(ec / 50) + 2) / 4), null);
-  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle((cs.w / 3) * (((Math.sin(ec / 25) + 1) / 8) + 1)), new Fill("#e0a204", (Math.sin(ec / 25) + 2) / 4), null);
-  rt.renderText(new Pair(cs.w / 2, cs.h / -2), new TextNode("Courier New", "Slay the Sphere", 0, cs.w / 40, "center"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w / 2, (cs.h / -2) - cs.w / 40), new TextNode("Courier New", "- click anywhere to begin -", 0, cs.w / 80, "center"), new Fill("#EEEEFF", 1));
+  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 2) * (((Math.sin(ec / 50) + 1) / 8) + 1)), new Fill("#e0a204", (Math.sin(ec / 50) + 2) / 4), null);
+  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 3) * (((Math.sin(ec / 25) + 1) / 8) + 1)), new Fill("#e0a204", (Math.sin(ec / 25) + 2) / 4), null);
+  rt.renderText(new Pair(cs.w / 2, cs.h / -2), new TextNode("Courier New", "Slay the Sphere", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
+  rt.renderText(new Pair(cs.w / 2, (cs.h / -2) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("Courier New", "- click anywhere to begin -", 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
   //game start
   if(et.getClick("left")) {
     gameState = "loading";
