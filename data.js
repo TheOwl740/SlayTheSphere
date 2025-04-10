@@ -8,8 +8,8 @@ const tk = new Toolkit();
 cs.setDimensions(window.innerWidth, window.innerHeight);
 
 //GLOBAL VARIABLES
-//freecam mode for debug
-let freecam = true;
+//freecam mode bool
+let freecam = false;
 //epoch counter (ticks since game start)
 let ec = 0;
 //level counter
@@ -31,8 +31,8 @@ const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 25);
 //turn controller class
 class TurnController {
   constructor() {
-    this.turn = 0;
     this.turnOrder = [];
+    this.currentAction = null;
   }
   //adds a new entity to the turn order
   add(entity) {
@@ -54,6 +54,8 @@ class TurnController {
   }
   //updates the turn order and runs actions
   update() {
+    //freecam control granted if on player turn
+    freecam = this.turnOrder[0].type === "player";
     //if no actions to be done
     if(this.currentAction === null) {
       //hold an action object or null placeholder
@@ -63,7 +65,7 @@ class TurnController {
         //set as current action
         this.currentAction = returnAction;
         //increase next turn of entity by action turn increase
-        this.turnOrder[0].nextTurn += returnAction.turnIncrease;
+        this.turnOrder[0].nextTurn = returnAction.turnIncrease;
         //re-sort
         this.turnOrder.sort((a, b) => {
           return a.nextTurn - b.nextTurn;
@@ -89,14 +91,22 @@ class Action {
   }
 }
 //move action subclass
-class Move extends Action {
-  constructor(actor, targetTile) {
+class Movement extends Action {
+  constructor(actor, targetTransform) {
     super(actor, actor.moveTime, 30);
     this.type = "move";
-    this.targetTile = targetTile;
+    this.startTransform = actor.transform.duplicate();
+    this.targetTransform = targetTransform;
+    this.stepLength = tk.calcDistance(this.startTransform, this.targetTransform) / 30;
+    this.moveDirection = tk.calcAngle(this.startTransform, this.targetTransform);
   }
   update() {
-    
+    this.actor.shape.r = this.moveDirection;
+    if(this.remainingDuration > 1) {
+      this.actor.transform.rotationalIncrease(this.moveDirection, this.stepLength);
+    } else {
+      this.actor.transform = this.targetTransform.duplicate();
+    }
   }
 }
 class Attack extends Action {
@@ -112,6 +122,7 @@ class Attack extends Action {
 //player class
 class Player {
   constructor(transform) {
+    this.type = "player";
     this.transform = transform;
     this.shape = new Shape([
       tk.calcRotationalTranslate(0, tileSize / 3),
@@ -120,6 +131,7 @@ class Player {
     ], 0);
     this.fill = new Fill("#6262e7", 1);
     this.nextTurn = 0;
+    this.moveTime = 1;
   }
   collider() {
     return new Collider(player.transform, player.shape);
@@ -128,6 +140,13 @@ class Player {
     rt.renderShape(this.transform, this.shape, this.fill, null);
   }
   runTurn() {
+    if(et.getClick("left")) {
+      //check for tile at click
+      let tileSelect = currentLevel.getTile(et.dCursor(rt));
+      if(tileSelect !== null && tileSelect.type === "floor" && tk.calcDistance(this.transform, tileSelect.transform) < tileSize * 1.5 && tk.calcDistance(this.transform, tileSelect.transform) > tileSize / 2) {
+        return new Movement(this, tileSelect.transform);
+      }
+    }
     return null;
   }
 }
@@ -157,6 +176,7 @@ class Cube extends Enemy {
     super(transform, new Rectangle(0, tileSize * 0.75, tileSize * 0.75));
     this.fill = new Fill("#f94f01", 1);
     this.nextTurn = currentTC.turn + 1;
+    this.moveTime = 1;
   }
   render() {
     let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
@@ -279,7 +299,7 @@ class Level {
         }
       }
     }
-    this.playerSpawn = this.map[rooms[mostDistant.x].x][rooms[mostDistant.x].y].transform;
+    this.playerSpawn = this.map[rooms[mostDistant.x].x][rooms[mostDistant.x].y].transform.duplicate();
     this.sphere = new Sphere(this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y].transform)
     //currentIndex pair to track current map matrix index
     let currentIndex = rooms[0].duplicate();
@@ -343,6 +363,14 @@ class Level {
       this.enemies[i].render();
     }
     this.sphere.render();
+  }
+  getTile(transform) {
+    for(let tile = 0; tile < 2500; tile++) {
+      if(tk.detectCollision(transform, this.map[Math.floor(tile / 50)][tile % 50].collider())) {
+        return this.map[Math.floor(tile / 50)][tile % 50]
+      }
+    }
+    return null;
   }
 }
 

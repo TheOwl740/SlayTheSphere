@@ -10,8 +10,8 @@ function update() {
       loadNewLevel();
       break;
     case "inGame":
-      updateGame();
       updateCamera();
+      updateGame();
       break;
   }
 }
