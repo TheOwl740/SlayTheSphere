@@ -4,8 +4,10 @@ const cs = new Canvas(document.getElementById("canvas"));
 const rt = new RenderTool(cs);
 const et = new EventTracker();
 const tk = new Toolkit();
-//canvas initialization
-cs.setDimensions(window.innerWidth, window.innerHeight);
+//canvas dimensions initialization
+let vh = window.visualViewport?.height || window.innerHeight;
+cs.setDimensions(window.innerWidth, vh);
+window.visualViewport?.addEventListener('resize', cs.setDimensions(window.innerWidth, window.visualViewport.height));
 
 //GLOBAL VARIABLES
 //freecam mode bool
