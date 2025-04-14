@@ -5,9 +5,7 @@ const rt = new RenderTool(cs);
 const et = new EventTracker();
 const tk = new Toolkit();
 //canvas dimensions initialization
-let vh = window.visualViewport?.height || window.innerHeight;
-cs.setDimensions(window.innerWidth, vh);
-window.visualViewport?.addEventListener('resize', cs.setDimensions(window.innerWidth, window.visualViewport.height));
+cs.setDimensions(window.innerWidth, window.innerHeight);
 
 //GLOBAL VARIABLES
 //freecam mode bool

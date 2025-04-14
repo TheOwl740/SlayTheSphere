@@ -69,12 +69,13 @@ class Pair {
 
 //event tracker
 class EventTracker {
-  constructor() {
+  constructor(cs) {
     this.type = "eventTracker";
     //access values
     this.pressedKeys = [];
     this.pressedButtons = [];
     this.cursor = new Pair(0, 0);
+    this.cRect = cs.element.getBoundingClientRect();
     //prevention listeners
     this.tabEnabled = true;
     this.rightClickEnabled = true;
@@ -96,7 +97,7 @@ class EventTracker {
       this.pressedKeys.splice(this.pressedKeys.indexOf(e.key), 1);
     });
     document.addEventListener("pointermove", (e) => {
-      [this.cursor.x, this.cursor.y] = [e.clientX, e.clientY * -1];
+      [this.cursor.x, this.cursor.y] = [(e.clientX - this.cRect.left) * (cs.element.width / this.cRect.width), (e.clientY - cRect.top) * (cs.element.height / cRect.height) * -1];
     });
     document.addEventListener("mousedown", (e) => {
       this.pressedButtons.push(e.button);
@@ -105,7 +106,7 @@ class EventTracker {
       this.pressedButtons.splice(this.pressedButtons.indexOf(e.key), 1);
     });
     document.addEventListener("touchstart", (e) => {
-      [this.cursor.x, this.cursor.y] = [e.touches[0].clientX, e.touches[0].clientY * -1];
+      [this.cursor.x, this.cursor.y] = [(e.touches[0].clientX - this.cRect.left) * (cs.element.width / this.cRect.width), (e.touches[0].clientY - cRect.top) * (cs.element.height / cRect.height) * -1];
       this.pressedButtons.push(0);
     });
     document.addEventListener("touchend", () => {
