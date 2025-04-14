@@ -2,7 +2,7 @@
 //engine tool constants
 const cs = new Canvas(document.getElementById("canvas"));
 const rt = new RenderTool(cs);
-const et = new EventTracker();
+const et = new EventTracker(cs);
 const tk = new Toolkit();
 //canvas dimensions initialization
 cs.setDimensions(window.innerWidth, window.innerHeight);
