@@ -23,7 +23,7 @@ let player = null;
 //turn controller object
 let currentTC = null;
 //landscape bool for multiplatform rendering
-const landscape = cs.w > cs.h ? true : false;
+const landscape = cs.w > cs.h;
 //tilesize for rendering tiles
 const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 15);
 
