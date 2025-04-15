@@ -92,36 +92,55 @@ class Action {
 }
 //move action subclass
 class Movement extends Action {
-  constructor(actor, targetTransform) {
-    super(actor, actor.moveTime, 30);
+  constructor(actor, targetTile) {
+    super(actor, actor.moveTime, 15);
     this.type = "move";
-    this.startTransform = actor.transform.duplicate();
-    this.targetTransform = targetTransform;
-    this.stepLength = tk.calcDistance(this.startTransform, this.targetTransform) / 30;
-    this.moveDirection = tk.calcAngle(this.startTransform, this.targetTransform);
+    this.targetTile = targetTile;
+    this.stepLength = tk.calcDistance(this.actor.transform, this.targetTile.transform) / this.duration;
+    this.moveDirection = tk.calcAngle(this.actor.transform, this.targetTile.transform);
   }
   update() {
-    this.actor.shape.r = this.moveDirection;
+    //on start
+    if(this.remainingDuration === this.duration) {
+      //set active tile
+      this.actor.tile = this.targetTile;
+      //face right direction
+      this.actor.shape.r = this.moveDirection;
+    }
+    //while running
     if(this.remainingDuration > 1) {
       this.actor.transform.rotationalIncrease(this.moveDirection, this.stepLength);
     } else {
-      this.actor.transform = this.targetTransform.duplicate();
+      this.actor.transform = this.targetTile.transform.duplicate();
     }
   }
 }
-class Attack extends Action {
+class Melee extends Action {
   constructor(actor, targetEntity) {
-    super(actor, actor.attackSpeed, 30);
+    super(actor, actor.attackSpeed, 15);
     this.type = "attack";
     this.targetEntity = targetEntity;
+    this.damage = actor.melee.getHit();
+    this.attackDirection = tk.calcAngle(this.actor.transform, this.targetEntity.transform);
   }
   update() {
-
+    //on start
+    if(this.remainingDuration === this.duration) {
+      //face right direction
+      this.actor.shape.r = this.attackDirection;
+    }
+    if(this.remainingDuration > 10) {
+      this.actor.transform.rotationalIncrease(this.attackDirection, tileSize / 10);
+    } else if(this.remainingDuration === 10) {
+      this.targetEntity.damage(this);
+    } else if(this.remainingDuration > 4) {
+      this.actor.transform.rotationalIncrease(this.attackDirection, tileSize / -10);
+    }
   }
 }
 //player class
 class Player {
-  constructor(transform) {
+  constructor(transform, tile) {
     this.type = "player";
     this.transform = transform;
     this.shape = new Shape([
@@ -130,8 +149,20 @@ class Player {
       tk.calcRotationalTranslate(240, tileSize / 3)
     ], 0);
     this.fill = new Fill("#6262e7", 1);
+    this.tile = currentLevel.getTile(transform);
     this.nextTurn = 0;
     this.moveTime = 1;
+    this.melee = {
+      time: 1,
+      damage: 10,
+      getHit: () => {
+        return this.melee.damage + tk.randomNum(Math.floor(this.melee.damage / -3), Math.floor(this.melee.damage / 3));
+      }
+    };
+    this.health = {
+      current: 20,
+      max: 20
+    }
   }
   collider() {
     return new Collider(player.transform, player.shape);
@@ -141,42 +172,65 @@ class Player {
   }
   runTurn() {
     if(et.getClick("left")) {
-      //check for tile at click
+      //get tile at click
       let tileSelect = currentLevel.getTile(et.dCursor(rt));
-      if(tileSelect !== null && tileSelect.type === "floor" && tk.calcDistance(this.transform, tileSelect.transform) < tileSize * 1.5 && tk.calcDistance(this.transform, tileSelect.transform) > tileSize / 2) {
-        return new Movement(this, tileSelect.transform);
+      //check against sphere
+      if(currentLevel.sphere.tile === tileSelect) {
+        return new Melee(this, currentLevel.sphere);
+      }
+      if(tileSelect?.type === "floor" && tk.calcDistance(this.transform, tileSelect.transform) < tileSize * 1.5 && tk.calcDistance(this.transform, tileSelect.transform) > tileSize / 2) {
+        return new Movement(this, tileSelect);
       }
     }
     return null;
   }
+  damage(attackAction) {
+    this.health.current -= attackAction.damage;
+  }
 }
 //general enemy class
 class Enemy {
-  constructor(transform, shape) {
+  constructor(transform, shape, tile) {
     this.transform = transform;
     this.shape = shape;
+    this.tile = tile;
   }
   collider() {
     return new Collider(this.transform, this.shape);
   }
 }
 class Sphere extends Enemy {
-  constructor(transform) {
-    super(transform, new Circle(tileSize * 2));
+  constructor(transform, tile) {
+    super(transform, new Circle(tileSize * 2), tile);
     this.fill = new Fill("#e0a204", 1);
+    this.health = {
+      current: 10,
+      max: 10
+    }
   }
   render() {
     let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
     rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.5 * sinMultiplier.x), null);
     rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.5 * sinMultiplier.y), null);
   }
+  damage(attackAction) {
+    this.health.current -= attackAction.damage;
+  }
 }
 class Cube extends Enemy {
-  constructor(transform) {
-    super(transform, new Rectangle(0, tileSize * 0.75, tileSize * 0.75));
+  constructor(transform, tile) {
+    super(transform, new Rectangle(0, tileSize * 0.75, tileSize * 0.75), tile);
     this.fill = new Fill("#f94f01", 1);
-    this.nextTurn = currentTC.turn + 1;
+    this.nextTurn = 1;
     this.moveTime = 1;
+    this.melee = {
+      time: 1,
+      damage: 5,
+    };
+    this.health = {
+      current: 10,
+      max: 10
+    }
   }
   render() {
     let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
@@ -184,6 +238,9 @@ class Cube extends Enemy {
   }
   runTurn() {
     return null;
+  }
+  damage(attackAction) {
+    this.health.current -= attackAction.damage;
   }
 }
 class Tile {
@@ -300,7 +357,7 @@ class Level {
       }
     }
     this.playerSpawn = this.map[rooms[mostDistant.x].x][rooms[mostDistant.x].y].transform.duplicate();
-    this.sphere = new Sphere(this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y].transform)
+    this.sphere = new Sphere(this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y].transform.duplicate(), this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y])
     //currentIndex pair to track current map matrix index
     let currentIndex = rooms[0].duplicate();
     //currentTarget pair which tracks the current carve target for first step
@@ -367,7 +424,7 @@ class Level {
   getTile(transform) {
     for(let tile = 0; tile < 2500; tile++) {
       if(tk.detectCollision(transform, this.map[Math.floor(tile / 50)][tile % 50].collider())) {
-        return this.map[Math.floor(tile / 50)][tile % 50]
+        return this.map[Math.floor(tile / 50)][tile % 50];
       }
     }
     return null;
