@@ -12,8 +12,6 @@ cs.setDimensions(window.visualViewport?.width || window.innerWidth, window.visua
 let freecam = false;
 //epoch counter (ticks since game start)
 let ec = 0;
-//level counter
-let levelCount = 0;
 //current game state for script handling
 let gameState = "homescreen";
 //current level object or null when loading
@@ -26,6 +24,8 @@ let currentTC = null;
 const landscape = cs.w > cs.h;
 //tilesize for rendering tiles
 const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 15);
+//blackscreen counter for running blackscreen animation
+let cutsceneCount = 0;
 
 //CLASSES
 //turn controller class
@@ -152,6 +152,7 @@ class Player {
     this.tile = currentLevel.getTile(transform);
     this.nextTurn = 0;
     this.moveTime = 1;
+    this.levelCount = 1;
     this.melee = {
       time: 1,
       damage: 10,
@@ -200,11 +201,11 @@ class Enemy {
   }
 }
 class Sphere extends Enemy {
-  constructor(transform, tile) {
+  constructor(transform, tile, levelCount) {
     super(transform, new Circle(tileSize * 2), tile);
     this.fill = new Fill("#e0a204", 1);
     this.health = {
-      current: 10,
+      current: 10 * levelCount,
       max: 10
     }
   }
@@ -212,9 +213,15 @@ class Sphere extends Enemy {
     let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
     rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.5 * sinMultiplier.x), null);
     rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.5 * sinMultiplier.y), null);
+    if(this.health.current < this.health.max) {
+      renderHealthbar(this, tileSize);
+    }
   }
   damage(attackAction) {
     this.health.current -= attackAction.damage;
+    if(this.health.current < 1) {
+      gameState = "loading";
+    }
   }
 }
 class Cube extends Enemy {
@@ -244,19 +251,19 @@ class Cube extends Enemy {
   }
 }
 class Tile {
-  constructor(transform, level) {
+  constructor(transform, index) {
     this.transform = transform;
-    this.level = level;
+    this.index = index;
+    this.shape = new Rectangle(0, tileSize, tileSize);
   }
 }
 //wall tile class
 class Wall extends Tile {
-  constructor(transform, level) {
-    super(transform, level);
+  constructor(transform, index) {
+    super(transform, index);
     this.type = "wall"
     this.fill = new Fill("#171717", 1);
     this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
-    this.shape = new Rectangle(0, tileSize, tileSize);
   }
   collider() {
     return new Collider(this.transform, this.shape);
@@ -267,12 +274,11 @@ class Wall extends Tile {
 }
 //floor tile subclass
 class Floor extends Tile {
-  constructor(transform, level) {
-    super(transform, level);
+  constructor(transform, index) {
+    super(transform, index);
     this.type = "floor"
     this.fill = new Fill("#343434", 1);
     this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
-    this.shape = new Rectangle(0, tileSize, tileSize);
   }
   collider() {
     return new Collider(this.transform, this.shape);
@@ -283,13 +289,14 @@ class Floor extends Tile {
 }
 //map and level dependents class
 class Level {
-  constructor() {
+  constructor(levelCount) {
     //data initialization
     this.map = [];
     this.items = [];
     this.enemies = [];
     this.playerSpawn = null;
     this.sphere = null;
+    this.levelCount = levelCount;
     //fill map with walls
     for(let i = 0; i < 50; i++) {
       this.map.push([]);
@@ -306,7 +313,7 @@ class Level {
     let dimensions = null;
     let checkFailed = null;
     //room count is variable, but maxes out at 10 + level, has a minimum of 2 rooms, and will halt after 1000 spawn attempts and minimum reached
-    while(rooms.length < (10 + levelCount) && (spawnAttempts < 1000 || rooms.length < 2)) {
+    while(rooms.length < (10 + this.levelCount) && (spawnAttempts < 1000 || rooms.length < 2)) {
       //increment spawn attempts
       spawnAttempts++;
       //set room dimensions to odd numbers between 3 and 9
@@ -337,7 +344,7 @@ class Level {
         //cycle through tiles again to insert floors
         for(let i = (dimensions.x + 1) / -2; i <= (dimensions.x + 1) / 2; i++) {
           for(let ii = (dimensions.y + 1) / -2; ii <= (dimensions.y + 1) / 2; ii++) {
-            this.map[checkIndex.x + i][checkIndex.y + ii] = new Floor(this.map[checkIndex.x + i][checkIndex.y + ii].transform, this);
+            this.map[checkIndex.x + i][checkIndex.y + ii] = new Floor(this.map[checkIndex.x + i][checkIndex.y + ii].transform, new Pair(checkIndex.x + i, checkIndex.y + ii));
           }
         }
       }
@@ -357,7 +364,7 @@ class Level {
       }
     }
     this.playerSpawn = this.map[rooms[mostDistant.x].x][rooms[mostDistant.x].y].transform.duplicate();
-    this.sphere = new Sphere(this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y].transform.duplicate(), this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y])
+    this.sphere = new Sphere(this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y].transform.duplicate(), this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y], this.levelCount)
     //currentIndex pair to track current map matrix index
     let currentIndex = rooms[0].duplicate();
     //currentTarget pair which tracks the current carve target for first step
@@ -386,7 +393,7 @@ class Level {
         }
         //insert floors
         if(this.map[currentIndex.x][currentIndex.y].type === "wall") {
-          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform);
+          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform, currentIndex.duplicate());
         }
       }
       //reset currentTarget to next room
@@ -407,7 +414,7 @@ class Level {
         }
         //insert floors
         if(this.map[currentIndex.x][currentIndex.y].type === "wall") {
-          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform);
+          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform, currentIndex.duplicate);
         }
       }
     }
@@ -421,6 +428,14 @@ class Level {
     }
     this.sphere.render();
   }
+  update() {
+    if(ec % 100 === 0) {
+      let spawnAttempt = this.map[tk.randomNum(1, 48)][tk.randomNum(1, 48)];
+      if(spawnAttempt.type === "floor" && tk.calcDistance(player.transform, spawnAttempt.transform) > tileSize * 10) {
+        this.enemies.push(new Cube(spawnAttempt.transform.duplicate(), spawnAttempt));
+      }
+    }
+  }
   getTile(transform) {
     for(let tile = 0; tile < 2500; tile++) {
       if(tk.detectCollision(transform, this.map[Math.floor(tile / 50)][tile % 50].collider())) {
@@ -429,71 +444,7 @@ class Level {
     }
     return null;
   }
-}
-
-//FUNCTIONS
-//renders everything during game and updates turns and controls
-function updateGame() {
-  //update turn control
-  currentTC.update();
-  //canvas clear
-  cs.fillAll(new Fill("#000000", 1));
-  //render map
-  currentLevel.render();
-  //render player
-  player.render();
-}
-//renders and updates button on homescreen
-function updateHomescreen() {
-  //canvas clear
-  cs.fillAll(new Fill("#000000", 1));
-  //rendering
-  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 2) * (((Math.sin(ec / 50) + 1) / 8) + 1)), new Fill("#e0a204", (Math.sin(ec / 50) + 2) / 4), null);
-  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 3) * (((Math.sin(ec / 25) + 1) / 8) + 1)), new Fill("#e0a204", (Math.sin(ec / 25) + 2) / 4), null);
-  rt.renderText(new Pair(cs.w / 2, cs.h / -2), new TextNode("Courier New", "Slay the Sphere", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w / 2, (cs.h / -2) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("Courier New", "- click anywhere to begin -", 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
-  //game start
-  if(et.getClick("left")) {
-    gameState = "loading";
+  getIndex(index) {
+    return this.map[index.x][index.y];
   }
-}
-//camera update for player and freecam
-function updateCamera() {
-  //in freecam mode
-  if(freecam) {
-    if(et.getKey("a")) {
-      rt.camera.x -= 10;
-    }
-    if(et.getKey("d")) {
-      rt.camera.x += 10;
-    }
-    if(et.getKey("w")) {
-      rt.camera.y += 10;
-    }
-    if(et.getKey("s")) {
-      rt.camera.y -= 10;
-    }
-  //in player locked mode
-  } else {
-    rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2))
-  }
-}
-//loads next level
-function loadNewLevel() {
-  //create new turn controller
-  currentTC = new TurnController();
-  //instantiate and generate new level
-  currentLevel = new Level();
-  //create new or apply transform to existing player
-  if(player === null) {
-    player = new Player(currentLevel.playerSpawn)
-  } else {
-    player.transform = currentLevel.playerSpawn;
-  }
-  //increment level counter
-  levelCount++;
-  //initialize turn controller data
-  currentTC.initialize();
-  //start game
-  gameState = "inGame";
 }

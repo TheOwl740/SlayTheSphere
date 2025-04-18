@@ -7,7 +7,7 @@ function update() {
       updateHomescreen()
       break;
     case "loading":
-      loadNewLevel();
+      updateLoadscreen();
       break;
     case "inGame":
       updateCamera();
