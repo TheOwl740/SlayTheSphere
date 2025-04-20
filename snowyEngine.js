@@ -65,6 +65,10 @@ class Pair {
   duplicate() {
     return new Pair(this.x, this.y);
   }
+  //returns a boolean if two pairs are equal
+  isEqualTo(pair) {
+    return this.x === pair.x && this.y === pair.y;
+  }
 }
 
 //event tracker

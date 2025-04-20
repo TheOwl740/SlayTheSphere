@@ -12,6 +12,7 @@ function update() {
     case "inGame":
       updateCamera();
       updateGame();
+      updateDebugger();
       break;
   }
 }

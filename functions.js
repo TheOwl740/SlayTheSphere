@@ -47,22 +47,25 @@ function updateCamera() {
 }
 //loads next level
 function loadNewLevel() {
-  //create new turn controller
-  currentTC = new TurnController();
-  //instantiate and generate new level
-  currentLevel = new Level(currentLevel?.levelCount + 1 || 1);
-  //create new or apply transform to existing player
-  if(player === null) {
-    player = new Player(currentLevel.playerSpawn)
-  } else {
-    player.transform = currentLevel.playerSpawn;
-  }
-  //initialize turn controller data
-  currentTC.initialize();
-  //lock camera to player
-  rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2));
-  //start game
-  gameState = "inGame";
+  return new Promise((resolve) => {
+    //create new turn controller
+    currentTC = new TurnController();
+    //instantiate and generate new level
+    currentLevel = new Level(currentLevel?.levelCount + 1 || 1);
+    //instantiate pathfinding controller on new level
+    currentPC = new PathfindingController(currentLevel.map);
+    //create new or apply transform to existing player
+    if(player === null) {
+      player = new Player(currentLevel.playerSpawn)
+    } else {
+      player.transform = currentLevel.playerSpawn;
+      player.movePath = [];
+      player.spherePath = currentPC.pathfind(this.tile.index, currentLevel.sphere.tile.index);
+    }
+    //initialize turn controller data
+    currentTC.initialize();
+    window.setTimeout(resolve, 1000);
+  });
 }
 //renders healthbar of an object, provided it has a health and transform object attached
 function renderHealthbar(targetObj, yOffset) {
@@ -71,11 +74,37 @@ function renderHealthbar(targetObj, yOffset) {
 }
 //updates the loadscreen before next level
 function updateLoadscreen() {
-  cutsceneCount++;
-  if(cutsceneCount < 100) {
-    cs.fillAll(new Fill("#000000", 0.07));
+  if(loadStarted) {
+    rt.camera = new Pair(0, 0);
+    cs.fillAll(new Fill("#000000", 1));
+    rt.renderText(new Pair(cs.w / 2, (cs.h / -2) + (landscape ? cs.w / 10 : cs.h / 10)), new TextNode("Courier New", "Loading...", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#FFFFFF", 1));
+    rt.renderRectangle(new Pair(cs.w / 2, cs.h / -2), new Rectangle(ec % 360, landscape ? cs.w / 10 : cs.h / 10, landscape ? cs.w / 10 : cs.h / 10), new Fill("#00bbff", 1), new Border("#0091c5", 1, 5, "round"));
+    rt.renderRectangle(new Pair(cs.w / 2, cs.h / -2), new Rectangle((ec % 360) * -1, landscape ? cs.w / 20 : cs.h / 20, landscape ? cs.w / 20 : cs.h / 20), new Fill("#00bbff", 1), new Border("#0091c5", 1, 5, "round"));
   } else {
-    cutsceneCount = 0;
-    loadNewLevel();
+    loadStarted = true;
+    loadNewLevel().then(() => {
+      //lock camera to player
+      rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2));
+      //start game
+      gameState = "inGame";
+      loadStarted = false;
+    });
+  }
+}
+//debug tools
+function updateDebugger() {
+  if(debug) {
+    //render path to sphere
+    for(i = 0; i < player.spherePath.length; i++) {
+      rt.renderRectangle(currentLevel.getIndex(player.spherePath[i]).transform, new Rectangle(0, 20, 20), new Fill("#FF0000", 1), null)
+    }
+    //render move path
+    for(i = 0; i < player.movePath.length; i++) {
+      rt.renderRectangle(currentLevel.getIndex(player.movePath[i]).transform, new Rectangle(0, 20, 20), new Fill("#FFFF00", 1), null)
+    }
+  } else {
+    if(et.getKey("d") && et.getKey("b") && ec % 60 === 0) {
+      debug = !debug;
+    }
   }
 }

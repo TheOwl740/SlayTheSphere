@@ -20,12 +20,16 @@ let currentLevel = null;
 let player = null;
 //turn controller object
 let currentTC = null;
+//pathfinding controller object
+let currentPC = null;
 //landscape bool for multiplatform rendering
 const landscape = cs.w > cs.h;
 //tilesize for rendering tiles
 const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 15);
-//blackscreen counter for running blackscreen animation
-let cutsceneCount = 0;
+//loadstarted tracker assists with loading
+let loadStarted = false;
+//debug boolean for debug menu tracking
+let debug = false;
 
 //CLASSES
 //turn controller class
@@ -112,6 +116,7 @@ class Movement extends Action {
       this.actor.transform.rotationalIncrease(this.moveDirection, this.stepLength);
     } else {
       this.actor.transform = this.targetTile.transform.duplicate();
+      this.actor.updatePath();
     }
   }
 }
@@ -140,7 +145,7 @@ class Melee extends Action {
 }
 //player class
 class Player {
-  constructor(transform, tile) {
+  constructor(transform) {
     this.type = "player";
     this.transform = transform;
     this.shape = new Shape([
@@ -150,6 +155,8 @@ class Player {
     ], 0);
     this.fill = new Fill("#6262e7", 1);
     this.tile = currentLevel.getTile(transform);
+    this.spherePath = currentPC.pathfind(this.tile.index, currentLevel.sphere.tile.index);
+    this.movePath = [];
     this.nextTurn = 0;
     this.moveTime = 1;
     this.levelCount = 1;
@@ -172,21 +179,33 @@ class Player {
     rt.renderShape(this.transform, this.shape, this.fill, null);
   }
   runTurn() {
-    if(et.getClick("left")) {
-      //get tile at click
-      let tileSelect = currentLevel.getTile(et.dCursor(rt));
+    let tileSelect;
+    //if there are moves left over
+    if(this.movePath.length > 0) {
+      tileSelect = currentLevel.getIndex(this.movePath[0]);
+      this.movePath.shift();
       //check against sphere
-      if(currentLevel.sphere.tile === tileSelect) {
+      if(currentLevel.sphere.tile === tileSelect && currentPC.octile(currentLevel.sphere.tile.index, this.tile.index) < 2) {
         return new Melee(this, currentLevel.sphere);
       }
-      if(tileSelect?.type === "floor" && tk.calcDistance(this.transform, tileSelect.transform) < tileSize * 1.5 && tk.calcDistance(this.transform, tileSelect.transform) > tileSize / 2) {
-        return new Movement(this, tileSelect);
+      //move if no attack options
+      return new Movement(this, tileSelect);
+    } else if(et.getClick("left")) {
+      //get tile at click
+      tileSelect = currentLevel.getTile(et.dCursor(rt));
+      //create new path if needed
+      if(tileSelect?.type === "floor" && currentPC.octile(this.tile.index, tileSelect.index) >= 2) {
+        this.movePath = currentPC.pathfind(this.tile.index, tileSelect.index);
+        console.log(this.movePath);
       }
     }
     return null;
   }
   damage(attackAction) {
     this.health.current -= attackAction.damage;
+  }
+  updatePath() {
+    this.spherePath = currentPC.pathfind(this.tile.index, currentLevel.sphere.tile.index);
   }
 }
 //general enemy class
@@ -249,6 +268,9 @@ class Cube extends Enemy {
   damage(attackAction) {
     this.health.current -= attackAction.damage;
   }
+  updatePath() {
+
+  }
 }
 class Tile {
   constructor(transform, index) {
@@ -262,6 +284,7 @@ class Wall extends Tile {
   constructor(transform, index) {
     super(transform, index);
     this.type = "wall"
+    this.walkable = false;
     this.fill = new Fill("#171717", 1);
     this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
   }
@@ -277,6 +300,7 @@ class Floor extends Tile {
   constructor(transform, index) {
     super(transform, index);
     this.type = "floor"
+    this.walkable = true;
     this.fill = new Fill("#343434", 1);
     this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
   }
@@ -301,7 +325,7 @@ class Level {
     for(let i = 0; i < 50; i++) {
       this.map.push([]);
       for(let ii = 0; ii < 50; ii++) {
-        this.map[i][ii] = new Wall(new Pair((i - 25) * (tileSize - 1), (ii - 25) * (tileSize - 1)), this);
+        this.map[i][ii] = new Wall(new Pair((i - 25) * (tileSize - 1), (ii - 25) * (tileSize - 1)), new Pair(i, ii));
       }
     }
     //list of validated rooms
@@ -414,7 +438,7 @@ class Level {
         }
         //insert floors
         if(this.map[currentIndex.x][currentIndex.y].type === "wall") {
-          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform, currentIndex.duplicate);
+          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform, currentIndex.duplicate());
         }
       }
     }
