@@ -17,5 +17,6 @@ function update() {
   }
 }
 
-//TIMER CONSTANT
-const timer = setInterval(update, 16);
+//start timer
+const gt = new GameTimer(update, 16);
+gt.start();

@@ -9,7 +9,7 @@ cs.setDimensions(window.visualViewport?.width || window.innerWidth, window.visua
 
 //GLOBAL VARIABLES
 //freecam mode bool
-let freecam = false;
+let freecam = true;
 //epoch counter (ticks since game start)
 let ec = 0;
 //current game state for script handling
@@ -37,6 +37,7 @@ class TurnController {
   constructor() {
     this.turnOrder = [];
     this.currentAction = null;
+    this.turn = 0;
   }
   //adds a new entity to the turn order
   add(entity) {
@@ -58,8 +59,6 @@ class TurnController {
   }
   //updates the turn order and runs actions
   update() {
-    //freecam control granted if on player turn
-    freecam = this.turnOrder[0].type === "player";
     //if no actions to be done
     if(this.currentAction === null) {
       //hold an action object or null placeholder
@@ -69,7 +68,8 @@ class TurnController {
         //set as current action
         this.currentAction = returnAction;
         //increase next turn of entity by action turn increase
-        this.turnOrder[0].nextTurn = returnAction.turnIncrease;
+        this.turnOrder[0].nextTurn += returnAction.turnIncrease;
+        this.turn = this.turnOrder[0].nextTurn;
         //re-sort
         this.turnOrder.sort((a, b) => {
           return a.nextTurn - b.nextTurn;
@@ -116,13 +116,12 @@ class Movement extends Action {
       this.actor.transform.rotationalIncrease(this.moveDirection, this.stepLength);
     } else {
       this.actor.transform = this.targetTile.transform.duplicate();
-      this.actor.updatePath();
     }
   }
 }
 class Melee extends Action {
   constructor(actor, targetEntity) {
-    super(actor, actor.attackSpeed, 15);
+    super(actor, actor.melee.time, 15);
     this.type = "attack";
     this.targetEntity = targetEntity;
     this.damage = actor.melee.getHit();
@@ -143,6 +142,15 @@ class Melee extends Action {
     }
   }
 }
+class Wait extends Action {
+  constructor(actor) {
+    super(actor, 1, 15);
+    this.type = "wait";
+  }
+  update() {
+    
+  }
+}
 //player class
 class Player {
   constructor(transform) {
@@ -156,7 +164,8 @@ class Player {
     this.fill = new Fill("#6262e7", 1);
     this.tile = currentLevel.getTile(transform);
     this.spherePath = currentPC.pathfind(this.tile.index, currentLevel.sphere.tile.index);
-    this.movePath = [];
+    this.movePath = null;
+    this.targetIndex = null;
     this.nextTurn = 0;
     this.moveTime = 1;
     this.levelCount = 1;
@@ -176,28 +185,39 @@ class Player {
     return new Collider(player.transform, player.shape);
   }
   render() {
-    rt.renderShape(this.transform, this.shape, this.fill, null);
+    let sinMultiplier = (Math.sin(ec / 50) / 4) + 1;
+    rt.renderShape(this.transform, this.shape, this.fill, new Border("#4b4be7", 1, 3 * sinMultiplier, "round"));
   }
   runTurn() {
-    let tileSelect;
-    //if there are moves left over
-    if(this.movePath.length > 0) {
-      tileSelect = currentLevel.getIndex(this.movePath[0]);
-      this.movePath.shift();
+    //update the path
+    this.updatePath();
+    //check if at target
+    if(this.targetIndex?.isEqualTo(this.tile.index)) {
+      this.targetIndex = null;
+      this.movePath = null;
+    }
+    //if there is a target
+    if(this.targetIndex === null) {
+      if(et.getClick("left")) {
+        //get tile at click
+        this.targetIndex = currentLevel.getTile(et.dCursor(rt))?.index || null;
+      }
+    } else {
       //check against sphere
-      if(currentLevel.sphere.tile === tileSelect && currentPC.octile(currentLevel.sphere.tile.index, this.tile.index) < 2) {
+      if(currentLevel.sphere.tile.index.isEqualTo(this.movePath[0])) {
+        this.targetIndex = null;
         return new Melee(this, currentLevel.sphere);
       }
-      //move if no attack options
-      return new Movement(this, tileSelect);
-    } else if(et.getClick("left")) {
-      //get tile at click
-      tileSelect = currentLevel.getTile(et.dCursor(rt));
-      //create new path if needed
-      if(tileSelect?.type === "floor" && currentPC.octile(this.tile.index, tileSelect.index) >= 2) {
-        this.movePath = currentPC.pathfind(this.tile.index, tileSelect.index);
-        console.log(this.movePath);
-      }
+      //check against cubes
+      currentLevel.enemies.forEach((enemy) => {
+        if(enemy.tile.index.isEqualTo(this.movePath[0])) {
+          this.targetIndex = null;
+          return new Melee(this, enemy);
+        }
+      });
+      this.updatePath();
+      //move if no attacks
+      return new Movement(this, currentLevel.getIndex(this.movePath[0]));
     }
     return null;
   }
@@ -206,6 +226,7 @@ class Player {
   }
   updatePath() {
     this.spherePath = currentPC.pathfind(this.tile.index, currentLevel.sphere.tile.index);
+    this.movePath = this.targetIndex === null ? null : currentPC.pathfind(this.tile.index, this.targetIndex);
   }
 }
 //general enemy class
@@ -225,7 +246,7 @@ class Sphere extends Enemy {
     this.fill = new Fill("#e0a204", 1);
     this.health = {
       current: 10 * levelCount,
-      max: 10
+      max: 10 * levelCount
     }
   }
   render() {
@@ -247,29 +268,95 @@ class Cube extends Enemy {
   constructor(transform, tile) {
     super(transform, new Rectangle(0, tileSize * 0.75, tileSize * 0.75), tile);
     this.fill = new Fill("#f94f01", 1);
-    this.nextTurn = 1;
+    this.nextTurn = tk.randomNum(0, 1000) / 1000;
     this.moveTime = 1;
+    this.state = "sleeping";
+    this.targetIndex = null;
+    this.path = null;
     this.melee = {
       time: 1,
       damage: 5,
+      getHit: () => {
+        return this.melee.damage + tk.randomNum(Math.floor(this.melee.damage / -3), Math.floor(this.melee.damage / 3));
+      }
     };
     this.health = {
       current: 10,
       max: 10
-    }
+    };
   }
   render() {
     let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
-    rt.renderRectangle(this.transform, new Rectangle(0, this.shape.w * (sinMultiplier.x ** 0.3), this.shape.h * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.5 * sinMultiplier.x), null);
+    rt.renderRectangle(this.transform, new Rectangle(0, this.shape.w * (sinMultiplier.x ** 0.3), this.shape.h * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.3 * sinMultiplier.x), null);
+    rt.renderRectangle(this.transform, new Rectangle(0, this.shape.w * (sinMultiplier.y ** 0.3) * 0.75, this.shape.h * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.3 * sinMultiplier.y), null);
+    if(this.health.current < this.health.max) {
+      renderHealthbar(this, tileSize);
+    }
   }
   runTurn() {
-    return null;
+    let octileToPlayer = currentPC.octile(player.tile.index, this.tile.index);
+    switch(this.state) {
+      case "sleeping":
+        //if sleeping, attempt to break out
+        if(tk.randomNum(0, octileToPlayer) < 2) {
+          this.state = "wandering";
+        }
+        //send wait
+        return new Wait(this);
+      case "wandering":
+        //open attack if close; will run to next switch
+        if(octileToPlayer < 5) {
+          this.state = "attacking";
+        } else {          
+          //attempt to choose new location if no target
+          if(this.targetIndex === null) {
+            let newTarget = currentLevel.getIndex(new Pair(this.tile.index.x + tk.randomNum(-10, 10), this.tile.index.y + tk.randomNum(-10, 10)));
+            //if valid target selected, assign
+            if(newTarget !== undefined && newTarget.type === "floor") {
+              this.targetIndex = newTarget.index;
+            //if no valid target, wait
+            } else {
+              return new Wait(this);
+            }
+          }
+          //update pathing before move
+          this.updatePath();
+          //set no target and wait if target reached
+          if(this.path === null) {
+            this.targetIndex = null;
+            return new Wait(this);
+          }
+          //move if target and path valid
+          return new Movement(this, currentLevel.getIndex(this.path[0]));
+        }
+      case "attacking":
+        //wait if target out of range
+        if(currentPC.octile(player.tile.index, this.tile.index) > 9) {
+          this.state = "wandering";
+          this.targetIndex = null;
+          this.path = null;
+          return new Wait(this);
+        } else {
+          //retarget
+          this.targetIndex = player.tile.index;
+          this.updatePath();
+          //attack if close
+          if(octileToPlayer < 2) {
+            return new Melee(this, player);
+          //move closer otherwise
+          } else {
+            return new Movement(this, currentLevel.getIndex(this.path[0]));
+          }
+        }
+      }
+      //backup
+      return null;
   }
   damage(attackAction) {
     this.health.current -= attackAction.damage;
   }
   updatePath() {
-
+    this.path = this.targetIndex === null ? null : currentPC.pathfind(this.tile.index, this.targetIndex);
   }
 }
 class Tile {
@@ -337,7 +424,7 @@ class Level {
     let dimensions = null;
     let checkFailed = null;
     //room count is variable, but maxes out at 10 + level, has a minimum of 2 rooms, and will halt after 1000 spawn attempts and minimum reached
-    while(rooms.length < (10 + this.levelCount) && (spawnAttempts < 1000 || rooms.length < 2)) {
+    while(rooms.length < (2 + this.levelCount) && (spawnAttempts < 1000 || rooms.length < 2)) {
       //increment spawn attempts
       spawnAttempts++;
       //set room dimensions to odd numbers between 3 and 9
@@ -442,6 +529,13 @@ class Level {
         }
       }
     }
+    //enemy spawning
+    while(this.enemies.length < levelCount) {
+      let spawnTile = this.map[tk.randomNum(1, 48)][tk.randomNum(1, 48)];
+      if(spawnTile.type === "floor" && tk.calcDistance(spawnTile.transform, this.playerSpawn) > tileSize * 5) {
+        this.enemies.push(new Cube(spawnTile.transform.duplicate(), spawnTile));
+      }
+    }
   }
   render() {
     for(let i = 0; i < 2500; i++) {
@@ -469,6 +563,6 @@ class Level {
     return null;
   }
   getIndex(index) {
-    return this.map[index.x][index.y];
+    return this.map[index.x][index.y] || null;
   }
 }

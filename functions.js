@@ -59,8 +59,9 @@ function loadNewLevel() {
       player = new Player(currentLevel.playerSpawn)
     } else {
       player.transform = currentLevel.playerSpawn;
+      player.tile = currentLevel.getTile(player.transform);
       player.movePath = [];
-      player.spherePath = currentPC.pathfind(this.tile.index, currentLevel.sphere.tile.index);
+      player.spherePath = currentPC.pathfind(player.tile.index, currentLevel.sphere.tile.index);
     }
     //initialize turn controller data
     currentTC.initialize();
@@ -95,16 +96,24 @@ function updateLoadscreen() {
 function updateDebugger() {
   if(debug) {
     //render path to sphere
-    for(i = 0; i < player.spherePath.length; i++) {
-      rt.renderRectangle(currentLevel.getIndex(player.spherePath[i]).transform, new Rectangle(0, 20, 20), new Fill("#FF0000", 1), null)
+    if(player.spherePath !== null) {
+      for(i = 0; i < player.spherePath.length; i++) {
+        rt.renderRectangle(currentLevel.getIndex(player.spherePath[i]).transform, new Rectangle(0, 20, 20), new Fill("#FF0000", 1), null);
+      }
     }
     //render move path
-    for(i = 0; i < player.movePath.length; i++) {
-      rt.renderRectangle(currentLevel.getIndex(player.movePath[i]).transform, new Rectangle(0, 20, 20), new Fill("#FFFF00", 1), null)
+    if(player.movePath !== null) {
+      for(i = 0; i < player.movePath.length; i++) {
+        rt.renderRectangle(currentLevel.getIndex(player.movePath[i]).transform, new Rectangle(0, 20, 20), new Fill("#FFFF00", 1), null);
+      }
     }
-  } else {
-    if(et.getKey("d") && et.getKey("b") && ec % 60 === 0) {
-      debug = !debug;
-    }
+    //render enemy paths
+    currentLevel.enemies.forEach((enemy) => {
+      if(enemy.path !== null) {
+        for(i = 0; i < enemy.path.length; i++) {
+          rt.renderRectangle(currentLevel.getIndex(enemy.path[i]).transform, new Rectangle(0, 20, 20), new Fill("#FF9900", 1), null);
+        }
+      }
+    });
   }
 }
