@@ -3,12 +3,16 @@
 function updateGame() {
   //update turn control
   currentTC.update();
+  //update level
+  currentLevel.update();
   //canvas clear
   cs.fillAll(new Fill("#000000", 1));
   //render map
   currentLevel.render();
   //render player
   player.render();
+  //update effects
+  currentEC.update();
 }
 //renders and updates button on homescreen
 function updateHomescreen() {
@@ -48,6 +52,8 @@ function updateCamera() {
 //loads next level
 function loadNewLevel() {
   return new Promise((resolve) => {
+    //create new effect controller
+    currentEC = new EffectController();
     //create new turn controller
     currentTC = new TurnController();
     //instantiate and generate new level
@@ -60,8 +66,7 @@ function loadNewLevel() {
     } else {
       player.transform = currentLevel.playerSpawn;
       player.tile = currentLevel.getTile(player.transform);
-      player.movePath = [];
-      player.spherePath = currentPC.pathfind(player.tile.index, currentLevel.sphere.tile.index);
+      player.movePath = null;
     }
     //initialize turn controller data
     currentTC.initialize();
@@ -95,12 +100,6 @@ function updateLoadscreen() {
 //debug tools
 function updateDebugger() {
   if(debug) {
-    //render path to sphere
-    if(player.spherePath !== null) {
-      for(i = 0; i < player.spherePath.length; i++) {
-        rt.renderRectangle(currentLevel.getIndex(player.spherePath[i]).transform, new Rectangle(0, 20, 20), new Fill("#FF0000", 1), null);
-      }
-    }
     //render move path
     if(player.movePath !== null) {
       for(i = 0; i < player.movePath.length; i++) {
@@ -115,5 +114,32 @@ function updateDebugger() {
         }
       }
     });
+  }
+}
+//renders hud overlay
+function renderHUD() {
+  rt.renderRectangle(new Pair(cs.w / 8, -cs.h + (cs.h / 32)).add(rt.camera), new Rectangle(0, cs.w / 4, cs.h / 16), new Fill("#d60000", 0.5), null);
+  rt.renderRectangle(new Pair((cs.w / 8) * (player.health.current / player.health.max), -cs.h + (cs.h / 32)).add(rt.camera), new Rectangle(0, (cs.w / 4) * (player.health.current / player.health.max), cs.h / 16), new Fill("#16d700", 0.5), null);
+  rt.renderText(new Pair(cs.w / 8, -cs.h + (cs.h / 32)).add(rt.camera), new TextNode("Courier New", `HP: ${player.health.current}/${player.health.max}`, 0, cs.w / 30, "center"), new Fill("#FFFFFF", 1));
+}
+//renders fail screen
+function updateFailscreen() {
+  //reset
+  player = null;
+  currentLevel = null;
+  currentEC = null;
+  currentTC = null;
+  currentPC = null;
+  rt.camera = new Pair(0, 0);
+  //canvas clear
+  cs.fillAll(new Fill("#000000", 1));
+  //rendering
+  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 3) * (((Math.sin(ec / 50) + 1) / 8) + 1)), new Fill("#d13c3c", (Math.sin(ec / 50) + 2) / 4), null);
+  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 4) * (((Math.sin(ec / 25) + 1) / 8) + 1)), new Fill("#d13c3c", (Math.sin(ec / 25) + 2) / 4), null);
+  rt.renderText(new Pair(cs.w / 2, cs.h / -2), new TextNode("Courier New", "Game Over", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
+  rt.renderText(new Pair(cs.w / 2, (cs.h / -2) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("Courier New", "- click anywhere for main menu -", 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
+  //game start
+  if(et.getClick("left")) {
+    window.setTimeout(() => {gameState = "homescreen"}, 100);
   }
 }

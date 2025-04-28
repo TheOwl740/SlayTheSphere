@@ -13,10 +13,14 @@ function update() {
       updateCamera();
       updateGame();
       updateDebugger();
+      renderHUD();
+      break;
+    case "gameOver":
+      updateFailscreen();
       break;
   }
 }
 
 //start timer
-const gt = new GameTimer(update, 16);
+gt = new GameTimer(update, 16);
 gt.start();
