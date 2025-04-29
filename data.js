@@ -34,7 +34,7 @@ let loadStarted = false;
 //debug boolean for debug menu tracking
 let debug = false;
 
-//mobile drag
+//mobile drag controller
 const tapData = {
   holdTime: 0,
   dragging: false,
@@ -43,30 +43,32 @@ const tapData = {
   realClick: false,
   rct: 0,
   update: () => {
-    if(et.getClick("left") && !landscape) {
-      tapData.realClick = false;
-      tapData.rct = 0;
-      tapData.holdTime++;
-      if(tapData.holdTime > 5) {
-        tapData.dragging = true;
-        rt.camera = tapData.cameraStart.duplicate().subtract(et.cursor.duplicate().subtract(tapData.dragStart));
-      } else if(tapData.holdTime < 2) {
-        tapData.dragStart = et.cursor.duplicate();
-        tapData.cameraStart = rt.camera.duplicate();
-      }
-    } else {
-      if(tapData.holdTime < 10 && tapData.holdTime > 0 && !tapData.realClick) {
-        tapData.realClick = true;
-        tapData.rct = 0;
-      } else if(tapData.realClick) {
-        tapData.rct++;
-      }
-      if(tapData.rct > 10) {
+    if(!landscape) {
+      if(et.getClick("left")) {
         tapData.realClick = false;
+        tapData.rct = 0;
+        tapData.holdTime++;
+        if(tapData.holdTime > 5) {
+          tapData.dragging = true;
+          rt.camera = tapData.cameraStart.duplicate().subtract(et.cursor.duplicate().subtract(tapData.dragStart));
+        } else if(tapData.holdTime < 2) {
+          tapData.dragStart = et.cursor.duplicate();
+          tapData.cameraStart = rt.camera.duplicate();
+        }
+      } else {
+        if(tapData.holdTime < 10 && tapData.holdTime > 0 && !tapData.realClick) {
+          tapData.realClick = true;
+          tapData.rct = 0;
+        } else if(tapData.realClick) {
+          tapData.rct++;
+        }
+        if(tapData.rct > 10) {
+          tapData.realClick = false;
+        }
+        tapData.dragStart = null;
+        tapData.holdTime = 0;
+        tapData.dragging = false;
       }
-      tapData.dragStart = null;
-      tapData.holdTime = 0;
-      tapData.dragging = false;
     }
   },
 };
@@ -111,7 +113,7 @@ class DamageNumber extends Effect {
   update() {
     this.remainingDuration--;
     if(this.sourceAttack.actor.tile.visible) {
-      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, cs.w / 25, "center"), new Fill("#a50000", this.remainingDuration / 200));
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, (landscape ? cs.w : cs.h) / 25, "center"), new Fill("#a50000", this.remainingDuration / 200));
     }
   }
 }
@@ -136,7 +138,7 @@ class WaitEffect extends Effect {
   update() {
     this.remainingDuration--;
     if(this.actor.tile.visible) {
-      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "z", 0, cs.w / 30, "center"), new Fill("#8500d2", this.remainingDuration / 200));
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "z", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#8500d2", this.remainingDuration / 200));
     }
   }
 }
@@ -638,7 +640,7 @@ class Level {
       //set room dimensions to odd numbers between 3 and 9
       dimensions = new Pair(1 + (tk.randomNum(1, 4) * 2), 1 + (tk.randomNum(1, 4) * 2));
       //set checkIndex to a tile at a random point within bounds
-      checkIndex = new Pair(tk.randomNum(1 + ((dimensions.x + 1) / 2), 48 - ((dimensions.x + 1) / 2)), tk.randomNum(1 + ((dimensions.y + 1) / 2), 48 - ((dimensions.y + 1) / 2)));
+      checkIndex = new Pair(tk.randomNum((this.levelCount < 4 ? 15 : 1) + ((dimensions.x + 1) / 2), (this.levelCount < 4 ? 34 : 48) - ((dimensions.x + 1) / 2)), tk.randomNum((this.levelCount < 4 ? 15 : 1) + ((dimensions.y + 1) / 2), (this.levelCount < 4 ? 34 : 48) - ((dimensions.y + 1) / 2)));
       //prepare for check
       checkFailed = false;
       //cycle through x tiles within dimensions + 1 so walls are on outside of room
