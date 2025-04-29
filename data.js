@@ -34,6 +34,8 @@ let loadStarted = false;
 //debug boolean for debug menu tracking
 let debug = false;
 
+//mobile drag
+
 //CLASSES
 //effect control class
 class EffectController {
@@ -73,7 +75,9 @@ class DamageNumber extends Effect {
   }
   update() {
     this.remainingDuration--;
-    rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, cs.w / 25, "center"), new Fill("#a50000", this.remainingDuration / 200));
+    if(this.sourceAttack.actor.tile.visible) {
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, cs.w / 25, "center"), new Fill("#a50000", this.remainingDuration / 200));
+    }
   }
 }
 //cube death subclass
@@ -84,7 +88,21 @@ class CubeDeath extends Effect {
   }
   update() {
     this.remainingDuration--;
-    rt.renderRectangle(this.transform, new Rectangle(0, this.cube.shape.w * (this.remainingDuration / 60), this.cube.shape.h * (this.remainingDuration / 60)), new Fill(this.cube.fill.color, this.remainingDuration / 60), null);
+    if(this.cube.tile.visible) {
+      rt.renderRectangle(this.transform, new Rectangle(0, this.cube.shape.w * (this.remainingDuration / 60), this.cube.shape.h * (this.remainingDuration / 60)), new Fill(this.cube.fill.color, this.remainingDuration / 60), null);
+    }
+  }
+}
+class WaitEffect extends Effect {
+  constructor(waitAction) {
+    super(200, waitAction.actor.transform);
+    this.actor = waitAction.actor;
+  }
+  update() {
+    this.remainingDuration--;
+    if(this.actor.tile.visible) {
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "z", 0, cs.w / 30, "center"), new Fill("#8500d2", this.remainingDuration / 200));
+    }
   }
 }
 //turn controller class
@@ -93,6 +111,7 @@ class TurnController {
     this.turnOrder = [];
     this.currentAction = null;
     this.turn = 0;
+    this.highestTurn = 0;
   }
   //adds a new entity to the turn order
   add(entity) {
@@ -132,7 +151,22 @@ class TurnController {
         this.currentAction = returnAction;
         //increase next turn of entity by action turn increase
         this.turnOrder[0].nextTurn += returnAction.turnIncrease;
+        //set current turn to nextTurn of entity
         this.turn = this.turnOrder[0].nextTurn;
+        //check for new highest turn
+        if(this.turn > this.highestTurn) {
+          //find absolute increase in turns
+          let absoluteIncrease = Math.floor(this.turn) - Math.floor(this.highestTurn);
+          //for each entity in the turn order
+          this.turnOrder.forEach((turnEnt) => {
+            //run a number of turn pings
+            for(let ping = 0; ping < absoluteIncrease; ping++) {
+              turnEnt.turnPing();
+            }
+          });
+          //set highest to new highest
+          this.highestTurn = this.turn;
+        }
         //re-sort
         this.turnOrder.sort((a, b) => {
           return a.nextTurn - b.nextTurn;
@@ -140,9 +174,14 @@ class TurnController {
       }
     //if action needs completed
     } else {
-      this.currentAction.update();
-      this.currentAction.remainingDuration--;
-      if(this.currentAction.remainingDuration <= 0) {
+      if(this.currentAction.actor.tile.visible) {
+        this.currentAction.update();
+        this.currentAction.remainingDuration--;
+        if(this.currentAction.remainingDuration <= 0) {
+          this.currentAction = null;
+        }
+      } else {
+        this.currentAction.complete();
         this.currentAction = null;
       }
     }
@@ -177,9 +216,18 @@ class Movement extends Action {
     //while running
     if(this.remainingDuration > 1) {
       this.actor.transform.rotationalIncrease(this.moveDirection, this.stepLength);
+    //last frame
     } else {
+      if(this.actor.type === "player") {
+        currentLevel.reshade();
+      }
       this.actor.transform = this.targetTile.transform.duplicate();
     }
+  }
+  complete() {
+    this.actor.tile = this.targetTile;
+    this.actor.transform = this.targetTile.transform.duplicate();
+    this.actor.shape.r = this.moveDirection;
   }
 }
 class Melee extends Action {
@@ -205,6 +253,10 @@ class Melee extends Action {
       this.actor.transform.rotationalIncrease(this.attackDirection, tileSize / -10);
     }
   }
+  complete() {
+    this.actor.shape.r = this.attackDirection;
+    this.targetEntity.damage(this);
+  }
 }
 class Wait extends Action {
   constructor(actor) {
@@ -212,7 +264,9 @@ class Wait extends Action {
     this.type = "wait";
   }
   update() {
-    
+    currentEC.add(new WaitEffect(this));
+  }
+  complete() {
   }
 }
 //player class
@@ -234,14 +288,15 @@ class Player {
     this.levelCount = 1;
     this.melee = {
       time: 1,
-      damage: 10,
+      damage: 5,
       getHit: () => {
         return this.melee.damage + tk.randomNum(Math.floor(this.melee.damage / -3), Math.floor(this.melee.damage / 3));
       }
     };
     this.health = {
       current: 20,
-      max: 20
+      max: 20,
+      regenTime: 10
     }
   }
   collider() {
@@ -262,7 +317,7 @@ class Player {
       //get tile at click
       let clickedTile = currentLevel.getTile(et.dCursor(rt));
       //if valid tile
-      if(clickedTile?.type === "floor") {
+      if(clickedTile?.type === "floor" && clickedTile?.revealed) {
         this.targetIndex = clickedTile.index
       }
     //if there is a target
@@ -289,6 +344,11 @@ class Player {
       return new Movement(this, currentLevel.getIndex(this.movePath[0]));
     }
     return null;
+  }
+  turnPing() {
+    if(Math.floor(currentTC.turn) % this.health.regenTime === 0 && this.health.current < this.health.max) {
+      this.health.current++;
+    }
   }
   damage(attackAction) {
     this.health.current -= attackAction.damage;
@@ -323,11 +383,13 @@ class Sphere extends Enemy {
     }
   }
   render() {
-    let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
-    rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.5 * sinMultiplier.x), null);
-    rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.5 * sinMultiplier.y), null);
-    if(this.health.current < this.health.max) {
-      renderHealthbar(this, tileSize);
+    if(this.tile.visible) {
+      let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
+      rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.5 * sinMultiplier.x), null);
+      rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.5 * sinMultiplier.y), null);
+      if(this.health.current < this.health.max) {
+        renderHealthbar(this, tileSize);
+      }
     }
   }
   damage(attackAction) {
@@ -359,12 +421,17 @@ class Cube extends Enemy {
     };
   }
   render() {
-    let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
-    rt.renderRectangle(this.transform, new Rectangle(0, this.shape.w * (sinMultiplier.x ** 0.3), this.shape.h * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.3 * sinMultiplier.x), null);
-    rt.renderRectangle(this.transform, new Rectangle(0, this.shape.w * (sinMultiplier.y ** 0.3) * 0.75, this.shape.h * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.3 * sinMultiplier.y), null);
-    if(this.health.current < this.health.max) {
-      renderHealthbar(this, tileSize);
+    if(this.tile.visible) {
+      let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
+      rt.renderRectangle(this.transform, new Rectangle(0, this.shape.w * (sinMultiplier.x ** 0.3), this.shape.h * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.3 * sinMultiplier.x), null);
+      rt.renderRectangle(this.transform, new Rectangle(0, this.shape.w * (sinMultiplier.y ** 0.3) * 0.75, this.shape.h * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.3 * sinMultiplier.y), null);
+      if(this.health.current < this.health.max) {
+        renderHealthbar(this, tileSize);
+      }
     }
+  }
+  turnPing() {
+
   }
   runTurn() {
     let octileToPlayer = currentPC.octile(player.tile.index, this.tile.index);
@@ -451,6 +518,8 @@ class Tile {
     this.transform = transform;
     this.index = index;
     this.shape = new Rectangle(0, tileSize, tileSize);
+    this.revealed = false;
+    this.visible = false;
   }
 }
 //wall tile class
@@ -466,7 +535,12 @@ class Wall extends Tile {
     return new Collider(this.transform, this.shape);
   }
   render() {
-    rt.renderRectangle(this.transform, this.shape, this.fill, this.border);
+    if(this.revealed) {
+      rt.renderRectangle(this.transform, this.shape, this.fill, this.border);
+      if(!this.visible) {
+        rt.renderRectangle(this.transform, this.shape, new Fill("#000000", 0.3), null);
+      }
+    }
   }
 }
 //floor tile subclass
@@ -482,7 +556,19 @@ class Floor extends Tile {
     return new Collider(this.transform, this.shape);
   }
   render() {
-    rt.renderRectangle(this.transform, this.shape, this.fill, this.border);
+    if(this.revealed) {
+      rt.renderRectangle(this.transform, this.shape, this.fill, this.border);
+      if(!this.visible) {
+        rt.renderRectangle(this.transform, this.shape, new Fill("#000000", 0.3), null);
+      }
+    }
+  }
+}
+//light node for shading
+class LightNode {
+  constructor(distance, index) {
+    this.index = index;
+    this.distance = distance;
   }
 }
 //map and level dependents class
@@ -667,5 +753,69 @@ class Level {
       });
     }
     return retList;
+  }
+  reshade() {
+    //darken all tiles
+    for(let ti = 0; ti < 2500; ti++) {
+      this.map[Math.floor(ti / 50)][ti % 50].visible = false;
+    }
+    //key function
+    function toKey(index) {
+      return index.x + "," + index.y;
+    }
+    //set of tile indices with finished lighting
+    const closed = new Set();
+    //array of light nodes ready to be evaluated, initialized at player index
+    const open = [new LightNode(0, player.tile.index.duplicate())];
+    //current node being evaluated
+    let current;
+    //loops until all open are closed
+    while(open.length > 0) {
+      //sort lowest dist first
+      open.sort((a, b) => {
+        return a.distance - b.distance;
+      });
+      //set current open
+      current = open[0];
+      //light tile on map
+      this.map[current.index.x][current.index.y].revealed = true;
+      this.map[current.index.x][current.index.y].visible = true;
+      //close & delete that open
+      open.shift();
+      closed.add(toKey(current.index))
+      //add new opens to list
+      for(let x = -1; x <= 1; x++) {
+        for(let y = -1; y <= 1; y++) {
+          if(!(x === 0 && y === 0)) {
+            //setup new index
+            let newIndex = current.index.duplicate().add(new Pair(x, y));
+            let newDist = current.distance + currentPC.octile(current.index, newIndex);
+            //check to see if already opened
+            open.forEach((openNode) => {
+              if(newIndex !== null && openNode.index.isEqualTo(newIndex)) {
+                newIndex = null;
+              }
+            });
+            //if unopened and close enough, add to open
+            if(newIndex !== null && newDist < 6 && !closed.has(toKey(newIndex))) {
+              let towardPlayerIndex = newIndex.duplicate();
+              if(player.tile.index.x !== newIndex.x) {
+                towardPlayerIndex.x += player.tile.index.x < newIndex.x ? -1 : 1
+              }
+              if(player.tile.index.y !== newIndex.y) {
+                towardPlayerIndex.y += player.tile.index.y < newIndex.y ? -1 : 1
+              }
+              if(this.map[newIndex.x][newIndex.y].type === "wall") {
+                //unshadow walls
+                this.map[newIndex.x][newIndex.y].revealed = true;
+                this.map[newIndex.x][newIndex.y].visible = true;
+              } else if(this.map[towardPlayerIndex.x][towardPlayerIndex.y].type !== "wall") {
+                open.push(new LightNode(newDist, newIndex));
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }

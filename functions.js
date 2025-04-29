@@ -91,28 +91,11 @@ function updateLoadscreen() {
     loadNewLevel().then(() => {
       //lock camera to player
       rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2));
+      //shade first area
+      currentLevel.reshade();
       //start game
       gameState = "inGame";
       loadStarted = false;
-    });
-  }
-}
-//debug tools
-function updateDebugger() {
-  if(debug) {
-    //render move path
-    if(player.movePath !== null) {
-      for(i = 0; i < player.movePath.length; i++) {
-        rt.renderRectangle(currentLevel.getIndex(player.movePath[i]).transform, new Rectangle(0, 20, 20), new Fill("#FFFF00", 1), null);
-      }
-    }
-    //render enemy paths
-    currentLevel.enemies.forEach((enemy) => {
-      if(enemy.path !== null) {
-        for(i = 0; i < enemy.path.length; i++) {
-          rt.renderRectangle(currentLevel.getIndex(enemy.path[i]).transform, new Rectangle(0, 20, 20), new Fill("#FF9900", 1), null);
-        }
-      }
     });
   }
 }
@@ -141,5 +124,24 @@ function updateFailscreen() {
   //game start
   if(et.getClick("left")) {
     window.setTimeout(() => {gameState = "homescreen"}, 100);
+  }
+}
+//debug tools
+function updateDebugger() {
+  if(debug) {
+    //render move path
+    if(player.movePath !== null) {
+      for(i = 0; i < player.movePath.length; i++) {
+        rt.renderRectangle(currentLevel.getIndex(player.movePath[i]).transform, new Rectangle(0, tileSize / 3, tileSize / 3), new Fill("#FFFF00", 0.5), null);
+      }
+    }
+    //render enemy paths
+    currentLevel.enemies.forEach((enemy) => {
+      if(enemy.path !== null) {
+        for(i = 0; i < enemy.path.length; i++) {
+          rt.renderRectangle(currentLevel.getIndex(enemy.path[i]).transform, new Rectangle(0, tileSize / 3, tileSize / 3), new Fill("#FF9900", 0.5), null);
+        }
+      }
+    });
   }
 }
