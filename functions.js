@@ -13,6 +13,10 @@ function updateGame() {
   player.render();
   //update effects
   currentEC.update();
+  //update tap controller
+  if(!landscape) {
+    tapData.update();
+  }
 }
 //renders and updates button on homescreen
 function updateHomescreen() {

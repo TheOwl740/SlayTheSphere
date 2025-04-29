@@ -35,6 +35,41 @@ let loadStarted = false;
 let debug = false;
 
 //mobile drag
+const tapData = {
+  holdTime: 0,
+  dragging: false,
+  dragStart: null,
+  cameraStart: null,
+  realClick: false,
+  rct: 0,
+  update: () => {
+    if(et.getClick("left") && !landscape) {
+      tapData.realClick = false;
+      tapData.rct = 0;
+      tapData.holdTime++;
+      if(tapData.holdTime > 5) {
+        tapData.dragging = true;
+        rt.camera = tapData.cameraStart.duplicate().subtract(et.cursor.duplicate().subtract(tapData.dragStart));
+      } else if(tapData.holdTime < 2) {
+        tapData.dragStart = et.cursor.duplicate();
+        tapData.cameraStart = rt.camera.duplicate();
+      }
+    } else {
+      if(tapData.holdTime < 10 && tapData.holdTime > 0 && !tapData.realClick) {
+        tapData.realClick = true;
+        tapData.rct = 0;
+      } else if(tapData.realClick) {
+        tapData.rct++;
+      }
+      if(tapData.rct > 10) {
+        tapData.realClick = false;
+      }
+      tapData.dragStart = null;
+      tapData.holdTime = 0;
+      tapData.dragging = false;
+    }
+  },
+};
 
 //CLASSES
 //effect control class
@@ -313,7 +348,7 @@ class Player {
       this.movePath = null;
     }
     //if there is no target and there is a targeting click
-    if(this.targetIndex === null && et.getClick("left")) {
+    if(this.targetIndex === null && (landscape ? et.getClick("left") : tapData.realClick)) {
       //get tile at click
       let clickedTile = currentLevel.getTile(et.dCursor(rt));
       //if valid tile
