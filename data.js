@@ -33,6 +33,8 @@ const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 15);
 let loadStarted = false;
 //debug boolean for debug menu tracking
 let debug = false;
+//click cooldown
+let clickCooldown = 0;
 
 //mobile drag controller
 const tapData = {
@@ -107,14 +109,36 @@ class Effect {
 //damage number effect subclass
 class DamageNumber extends Effect {
   constructor(attackAction) {
-    super(200, attackAction.targetEntity.transform);
+    super(60, attackAction.targetEntity.transform);
     this.sourceAttack = attackAction;
   }
   update() {
     this.remainingDuration--;
     if(this.sourceAttack.actor.tile.visible) {
-      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, (landscape ? cs.w : cs.h) / 25, "center"), new Fill("#a50000", this.remainingDuration / 200));
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, (landscape ? cs.w / 50 : cs.h / 35), "center"), new Fill("#561919", this.remainingDuration / 60));
     }
+  }
+}
+//xp gain effect
+class XPEffect extends Effect {
+  constructor(xpCount) {
+    super(60, player.transform);
+    this.xpCount = xpCount;
+  }
+  update() {
+    this.remainingDuration--;
+    rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "+" + this.xpCount + "xp", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#c4b921", this.remainingDuration / 60));
+  }
+}
+//skill point gain effect
+class SPEffect extends Effect {
+  constructor(pointCount) {
+    super(120, player.transform);
+    this.pointCount = pointCount;
+  }
+  update() {
+    this.remainingDuration--;
+    rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", `+${this.pointCount} Skill Point${this.pointCount > 1 ? "s" : ""}!`, 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#c4b921", this.remainingDuration / 120));
   }
 }
 //cube death subclass
@@ -130,15 +154,30 @@ class CubeDeath extends Effect {
     }
   }
 }
+class NewLevelEffect extends Effect {
+  constructor() {
+    super(300, new Pair(cs.w / 2, cs.h / -2).add(rt.camera))
+  }
+  update() {
+    this.remainingDuration--;
+    if(this.remainingDuration > 150) {
+      rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, ((landscape ? cs.w : cs.h) / 10) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, ((landscape ? cs.w : cs.h) / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+    } else {
+      rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, (landscape ? cs.w : cs.h) / 10, "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, ((landscape ? cs.w : cs.h) / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+    }
+  }
+}
 class WaitEffect extends Effect {
   constructor(waitAction) {
-    super(200, waitAction.actor.transform);
+    super(100, waitAction.actor.transform);
     this.actor = waitAction.actor;
   }
   update() {
     this.remainingDuration--;
     if(this.actor.tile.visible) {
-      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "z", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#8500d2", this.remainingDuration / 200));
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "z", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#8500d2", this.remainingDuration / 100));
     }
   }
 }
@@ -323,6 +362,8 @@ class Player {
     this.nextTurn = 0;
     this.moveTime = 1;
     this.levelCount = 1;
+    this.xp = 0;
+    this.skillPoints = 0;
     this.melee = {
       time: 1,
       damage: 5,
@@ -333,7 +374,8 @@ class Player {
     this.health = {
       current: 20,
       max: 20,
-      regenTime: 10
+      regenTime: 10,
+      regenPoints: 0
     }
   }
   collider() {
@@ -383,7 +425,8 @@ class Player {
     return null;
   }
   turnPing() {
-    if(Math.floor(currentTC.turn) % this.health.regenTime === 0 && this.health.current < this.health.max) {
+    this.health.regenPoints--;
+    if(Math.floor(currentTC.turn) % this.health.regenTime === 0 && this.health.current < this.health.max && this.health.regenPoints > 0) {
       this.health.current++;
     }
   }
@@ -392,7 +435,22 @@ class Player {
     this.targetIndex = null;
     this.movePath = null;
     if(this.health.current < 1) {
+      clickCooldown = 100;
       gameState = "gameOver";
+    }
+  }
+  addXP(count) {
+    this.xp += count;
+    this.health.regenPoints += count * 3;
+    let points = Math.floor(this.xp / (currentLevel.levelCount * 5))
+    if(points > 0) {
+      currentEC.add(new SPEffect(points));
+      this.skillPoints += points;
+      this.xp -= points * currentLevel.levelCount * 5;
+      this.health.current += points * 5;
+      this.health.max += points * 5;
+    } else {
+      currentEC.add(new XPEffect(count));
     }
   }
   updatePath() {
@@ -413,6 +471,7 @@ class Enemy {
 class Sphere extends Enemy {
   constructor(transform, tile, levelCount) {
     super(transform, new Circle(tileSize * 2), tile);
+    this.type = "sphere"
     this.fill = new Fill("#e0a204", 1);
     this.health = {
       current: 10 * levelCount,
@@ -439,12 +498,14 @@ class Sphere extends Enemy {
 class Cube extends Enemy {
   constructor(transform, tile) {
     super(transform, new Rectangle(0, tileSize * 0.75, tileSize * 0.75), tile);
+    this.type = "cube";
     this.fill = new Fill("#f94f01", 1);
     this.nextTurn = tk.randomNum(0, 1000) / 1000;
     this.moveTime = 1;
     this.state = "sleeping";
     this.targetIndex = null;
     this.path = null;
+    this.xpValue = 2;
     this.melee = {
       time: 1,
       damage: 5,
@@ -760,7 +821,10 @@ class Level {
     for(let i = 0; i < currentLevel.enemies.length; i++) {
       if(currentLevel.enemies[i].health.current < 1) {
         currentTC.remove(currentLevel.enemies[i]);
-        currentEC.add(new CubeDeath(currentLevel.enemies[i]));
+        if(currentLevel.enemies[i].type === "cube") {
+          currentEC.add(new CubeDeath(currentLevel.enemies[i]));
+          player.addXP(currentLevel.enemies[i].xpValue);
+        }
         currentLevel.enemies.splice(i, 1);
         i--;
       }

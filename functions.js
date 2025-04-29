@@ -28,8 +28,11 @@ function updateHomescreen() {
   rt.renderText(new Pair(cs.w / 2, cs.h / -2), new TextNode("Courier New", "Slay the Sphere", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
   rt.renderText(new Pair(cs.w / 2, (cs.h / -2) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("Courier New", `- ${landscape ? "click" : "tap"} anywhere to begin -`, 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
   //game start
-  if(et.getClick("left")) {
+  if(et.getClick("left") && clickCooldown < 1) {
     gameState = "loading";
+    clickCooldown = 100;
+  } else {
+    clickCooldown--;
   }
 }
 //camera update for player and freecam
@@ -97,6 +100,8 @@ function updateLoadscreen() {
       rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2));
       //shade first area
       currentLevel.reshade();
+      //add levelEffect
+      currentEC.add(new NewLevelEffect());
       //start game
       gameState = "inGame";
       loadStarted = false;
@@ -105,9 +110,14 @@ function updateLoadscreen() {
 }
 //renders hud overlay
 function renderHUD() {
-  rt.renderRectangle(new Pair(cs.w / 8, -cs.h + (cs.h / 32)).add(rt.camera), new Rectangle(0, cs.w / 4, cs.h / 16), new Fill("#d60000", 0.5), null);
-  rt.renderRectangle(new Pair((cs.w / 8) * (player.health.current / player.health.max), -cs.h + (cs.h / 32)).add(rt.camera), new Rectangle(0, (cs.w / 4) * (player.health.current / player.health.max), cs.h / 16), new Fill("#16d700", 0.5), null);
-  rt.renderText(new Pair(cs.w / 8, -cs.h + (cs.h / 32)).add(rt.camera), new TextNode("Courier New", `HP: ${player.health.current}/${player.health.max}`, 0, cs.w / 30, "center"), new Fill("#FFFFFF", 1));
+  //health bar
+  rt.renderRectangle(new Pair(cs.w / 8, cs.h / -32).add(rt.camera), new Rectangle(0, cs.w / 4, cs.h / 16), new Fill("#d60000", 0.5), null);
+  rt.renderRectangle(new Pair((cs.w / 8) * (player.health.current / player.health.max), cs.h / -32).add(rt.camera), new Rectangle(0, (cs.w / 4) * (player.health.current / player.health.max), cs.h / 16), new Fill("#16d700", 0.8), null);
+  rt.renderText(new Pair(cs.w / 8, cs.h / -32).add(rt.camera), new TextNode("Courier New", `HP: ${player.health.current}/${player.health.max}`, 0, cs.w / 30, "center"), new Fill("#FFFFFF", 1));
+  //xp bar
+  rt.renderRectangle(new Pair((cs.w / 4) + (cs.w / 8), cs.h / -32).add(rt.camera), new Rectangle(0, cs.w / 4, cs.h / 16), new Fill("#82846e", 0.5), null);
+  rt.renderRectangle(new Pair((cs.w / 4) + ((cs.w / 8) * (player.xp / (currentLevel.levelCount * 5))), cs.h / -32).add(rt.camera), new Rectangle(0, (cs.w / 4) * (player.xp / (currentLevel.levelCount * 5)), cs.h / 16), new Fill("#c4b921", 0.8), null);
+  rt.renderText(new Pair((cs.w / 4) + (cs.w / 8), cs.h / -32).add(rt.camera), new TextNode("Courier New", `XP: ${player.xp}/${currentLevel.levelCount * 5}`, 0, cs.w / 30, "center"), new Fill("#FFFFFF", 1));
 }
 //renders fail screen
 function updateFailscreen() {
@@ -126,8 +136,11 @@ function updateFailscreen() {
   rt.renderText(new Pair(cs.w / 2, cs.h / -2), new TextNode("Courier New", "Game Over", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
   rt.renderText(new Pair(cs.w / 2, (cs.h / -2) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("Courier New", `- ${landscape ? "click" : "tap"} anywhere for main menu -`, 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
   //game start
-  if(et.getClick("left")) {
-    window.setTimeout(() => {gameState = "homescreen"}, 100);
+  if(et.getClick("left") && clickCooldown < 1) {
+    gameState = "homescreen";
+    clickCooldown = 100;
+  } else {
+    clickCooldown--;
   }
 }
 //debug tools
