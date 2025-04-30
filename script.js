@@ -2,6 +2,8 @@
 function update() {
   //increment epoch counter
   ec++;
+  //update button count
+  bc.update();
   switch(gameState) {
     case "homescreen":
       updateHomescreen()
@@ -12,8 +14,10 @@ function update() {
     case "inGame":
       updateCamera();
       updateGame();
-      updateDebugger();
-      renderHUD();
+      updateHUD();
+      break;
+    case "skillTree":
+      updateSkillTree();
       break;
     case "gameOver":
       updateFailscreen();

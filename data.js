@@ -7,6 +7,9 @@ const tk = new Toolkit();
 let gt;
 //canvas dimensions initialization
 cs.setDimensions(window.visualViewport?.width || window.innerWidth, window.visualViewport?.height || window.innerHeight);
+//browser limiters
+et.tabEnabled = false;
+et.rightClickEnabled = false;
 
 //GLOBAL VARIABLES
 //freecam mode bool
@@ -31,11 +34,8 @@ const landscape = cs.w > cs.h;
 const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 15);
 //loadstarted tracker assists with loading
 let loadStarted = false;
-//debug boolean for debug menu tracking
-let debug = false;
-//click cooldown
-let clickCooldown = 0;
 
+//OBJECTS
 //mobile drag controller
 const tapData = {
   holdTime: 0,
@@ -73,6 +73,51 @@ const tapData = {
       }
     }
   },
+};
+//hud button data
+const buttonData = {
+  stopWait: {
+    transform: () => {return new Pair(cs.w - (cs.h / 32), cs.h / -32)},
+    shape: new Rectangle(0, cs.h / 16, cs.h / 16),
+    collider: () => {return new Collider(buttonData.stopWait.transform(), buttonData.stopWait.shape)}
+  },
+  skillTree: {
+    transform: () => {return new Pair(cs.w - ((cs.h * 3) / 32), cs.h / -32)},
+    shape: new Rectangle(0, cs.h / 16, cs.h / 16),
+    collider: () => {return new Collider(buttonData.skillTree.transform(), buttonData.skillTree.shape)}
+  },
+  exit: {
+    transform: () => {return new Pair(cs.w - (cs.h / 32), cs.h / -32)},
+    shape: new Rectangle(0, cs.h / 16, cs.h / 16),
+    collider: () => {return new Collider(buttonData.exit.transform(), buttonData.exit.shape)}
+  },
+  upgrade: {
+    transforms: {
+      speed: () => {return new Pair(cs.w / 8, (cs.h / -2) + (cs.h / 8))},
+      attack: () => {return new Pair(cs.w - (cs.w / 8), (cs.h / -2) + (cs.h / 8))},
+      health: () => {return new Pair(cs.w / 8, (cs.h / -2) - (cs.h / 8))},
+      regen: () => {return new Pair(cs.w - (cs.w / 8), (cs.h / -2) - (cs.h / 8))},
+    },
+    shape: new Rectangle(0, cs.h / 8, cs.h / 16),
+    collider: () => {return new Collider(buttonData.exit.transform(), buttonData.exit.shape)}
+  }
+};
+//button count data
+const bc = {
+  time: 0,
+  ready: () => {
+    if(bc.time > 0) {
+      return false;
+    } else {
+      bc.time = 50;
+      return true;
+    }
+  },
+  update: () => {
+    if(bc.time > 0) {
+      bc.time--;
+    }
+  }
 };
 
 //CLASSES
@@ -161,11 +206,11 @@ class NewLevelEffect extends Effect {
   update() {
     this.remainingDuration--;
     if(this.remainingDuration > 150) {
-      rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, ((landscape ? cs.w : cs.h) / 10) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
-      rt.renderText(this.transform.duplicate().subtract(new Pair(0, cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, ((landscape ? cs.w : cs.h) / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+      rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, (cs.w / 10) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, (cs.w / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
     } else {
-      rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, (landscape ? cs.w : cs.h) / 10, "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
-      rt.renderText(this.transform.duplicate().subtract(new Pair(0, cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, ((landscape ? cs.w : cs.h) / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+      rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, cs.w / 10, "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, (cs.w / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
     }
   }
 }
@@ -386,6 +431,10 @@ class Player {
     rt.renderShape(this.transform, this.shape, this.fill, new Border("#4b4be7", 1, 3 * sinMultiplier, "round"));
   }
   runTurn() {
+    //wait action
+    if(this.targetIndex === null && ((tk.detectCollision(et.cursor, buttonData.stopWait.collider()) && ((landscape ? et.getClick("left") : tapData.realClick))) || et.getKey("z")) && bc.ready()) {
+      return new Wait(this);
+    }
     //check if at target
     if(this.targetIndex?.isEqualTo(this.tile.index)) {
       this.targetIndex = null;
@@ -435,7 +484,6 @@ class Player {
     this.targetIndex = null;
     this.movePath = null;
     if(this.health.current < 1) {
-      clickCooldown = 100;
       gameState = "gameOver";
     }
   }
@@ -455,6 +503,13 @@ class Player {
   }
   updatePath() {
     this.movePath = currentPC.pathfind(this.tile.index, this.targetIndex, currentLevel.getNonWalkables(this), 2000);
+  }
+  updateAux() {
+    //cancel move operation
+    if(this.targetIndex !== null && ((tk.detectCollision(et.dCursor(rt), new Collider(buttonData.stopWait.transform(), buttonData.stopWait.shape)) && (landscape ? et.getClick("left") : tapData.realClick)) || et.getKey("x")) && bc.ready()) {
+      this.targetIndex = null;
+      this.movePath = null;
+    }
   }
 }
 //general enemy class
@@ -505,7 +560,7 @@ class Cube extends Enemy {
     this.state = "sleeping";
     this.targetIndex = null;
     this.path = null;
-    this.xpValue = 2;
+    this.xpValue = tk.randomNum(3, 6);
     this.melee = {
       time: 1,
       damage: 5,

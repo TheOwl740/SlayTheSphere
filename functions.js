@@ -11,6 +11,8 @@ function updateGame() {
   currentLevel.render();
   //render player
   player.render();
+  //update player controls
+  player.updateAux();
   //update effects
   currentEC.update();
   //update tap controller
@@ -28,11 +30,8 @@ function updateHomescreen() {
   rt.renderText(new Pair(cs.w / 2, cs.h / -2), new TextNode("Courier New", "Slay the Sphere", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
   rt.renderText(new Pair(cs.w / 2, (cs.h / -2) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("Courier New", `- ${landscape ? "click" : "tap"} anywhere to begin -`, 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
   //game start
-  if(et.getClick("left") && clickCooldown < 1) {
+  if(et.getClick("left") && bc.ready()) {
     gameState = "loading";
-    clickCooldown = 100;
-  } else {
-    clickCooldown--;
   }
 }
 //camera update for player and freecam
@@ -109,7 +108,7 @@ function updateLoadscreen() {
   }
 }
 //renders hud overlay
-function renderHUD() {
+function updateHUD() {
   //health bar
   rt.renderRectangle(new Pair(cs.w / 8, cs.h / -32).add(rt.camera), new Rectangle(0, cs.w / 4, cs.h / 16), new Fill("#d60000", 0.5), null);
   rt.renderRectangle(new Pair((cs.w / 8) * (player.health.current / player.health.max), cs.h / -32).add(rt.camera), new Rectangle(0, (cs.w / 4) * (player.health.current / player.health.max), cs.h / 16), new Fill("#16d700", 0.8), null);
@@ -118,6 +117,20 @@ function renderHUD() {
   rt.renderRectangle(new Pair((cs.w / 4) + (cs.w / 8), cs.h / -32).add(rt.camera), new Rectangle(0, cs.w / 4, cs.h / 16), new Fill("#82846e", 0.5), null);
   rt.renderRectangle(new Pair((cs.w / 4) + ((cs.w / 8) * (player.xp / (currentLevel.levelCount * 5))), cs.h / -32).add(rt.camera), new Rectangle(0, (cs.w / 4) * (player.xp / (currentLevel.levelCount * 5)), cs.h / 16), new Fill("#c4b921", 0.8), null);
   rt.renderText(new Pair((cs.w / 4) + (cs.w / 8), cs.h / -32).add(rt.camera), new TextNode("Courier New", `XP: ${player.xp}/${currentLevel.levelCount * 5}`, 0, cs.w / 30, "center"), new Fill("#FFFFFF", 1));
+  //wait/cancel button
+  rt.renderRectangle(buttonData.stopWait.transform().add(rt.camera), buttonData.stopWait.shape, new Fill("#82846e", 0.5), null);
+  if(player.targetIndex === null) {
+    rt.renderText(buttonData.stopWait.transform().add(rt.camera), new TextNode("Courier New", "z", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#8500d2", 1));
+  } else {
+    rt.renderText(buttonData.stopWait.transform().add(rt.camera), new TextNode("Courier New", "x", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#d21c1c", 1));
+  }
+  //skill tree button
+  rt.renderRectangle(buttonData.skillTree.transform().add(rt.camera), buttonData.skillTree.shape, new Fill("#82846e", 0.5), null);
+  rt.renderText(buttonData.skillTree.transform().add(rt.camera), new TextNode("Courier New", "+", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#c4b921", 1));
+  //skill tree access
+  if(tk.detectCollision(et.cursor, buttonData.skillTree.collider()) && ((landscape ? et.getClick("left") : tapData.realClick) || et.getKey("q")) && bc.ready()) {
+    gameState = "skillTree";
+  }
 }
 //renders fail screen
 function updateFailscreen() {
@@ -136,29 +149,32 @@ function updateFailscreen() {
   rt.renderText(new Pair(cs.w / 2, cs.h / -2), new TextNode("Courier New", "Game Over", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
   rt.renderText(new Pair(cs.w / 2, (cs.h / -2) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("Courier New", `- ${landscape ? "click" : "tap"} anywhere for main menu -`, 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
   //game start
-  if(et.getClick("left") && clickCooldown < 1) {
+  if(et.getClick("left") && bc.ready()) {
     gameState = "homescreen";
-    clickCooldown = 100;
-  } else {
-    clickCooldown--;
   }
 }
-//debug tools
-function updateDebugger() {
-  if(debug) {
-    //render move path
-    if(player.movePath !== null) {
-      for(i = 0; i < player.movePath.length; i++) {
-        rt.renderRectangle(currentLevel.getIndex(player.movePath[i]).transform, new Rectangle(0, tileSize / 3, tileSize / 3), new Fill("#FFFF00", 0.5), null);
-      }
-    }
-    //render enemy paths
-    currentLevel.enemies.forEach((enemy) => {
-      if(enemy.path !== null) {
-        for(i = 0; i < enemy.path.length; i++) {
-          rt.renderRectangle(currentLevel.getIndex(enemy.path[i]).transform, new Rectangle(0, tileSize / 3, tileSize / 3), new Fill("#FF9900", 0.5), null);
-        }
-      }
-    });
+function updateSkillTree() {
+  //clear canvas
+  cs.fillAll("#000000", 1)
+  //exit button render
+  rt.renderRectangle(buttonData.exit.transform().add(rt.camera), buttonData.exit.shape, new Fill("#82846e", 0.5), null);
+  rt.renderText(buttonData.exit.transform().add(rt.camera), new TextNode("Courier New", "x", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#d13c3c", 1));
+  //exit button function
+  if(tk.detectCollision(et.cursor, buttonData.exit.collider()) && ((landscape ? et.getClick("left") : tapData.realClick) || et.getKey("x")) && bc.ready()) {
+    gameState = "inGame";
   }
+  //main text and points
+  rt.renderText(new Pair(cs.w / 2, cs.h / -2).add(rt.camera), new TextNode("Courier New", `Upgrades: ${player.skillPoints}pts`, 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#ffffff", 1));
+  //speed upgrade
+  rt.renderRectangle(buttonData.upgrade.transforms.speed().add(rt.camera), buttonData.upgrade.shape, new Fill("#6f6f6f", 1), null);
+  rt.renderText(buttonData.upgrade.transforms.speed().add(rt.camera), new TextNode("Courier New", "speed", 0, (landscape ? cs.w : cs.h) / 35, "center"), new Fill("#fff200", 1));
+  //attack upgrade
+  rt.renderRectangle(buttonData.upgrade.transforms.attack().add(rt.camera), buttonData.upgrade.shape, new Fill("#6f6f6f", 1), null);
+  rt.renderText(buttonData.upgrade.transforms.attack().add(rt.camera), new TextNode("Courier New", "attack", 0, (landscape ? cs.w : cs.h) / 35, "center"), new Fill("#d13c3c", 1));
+  //speed upgrade
+  rt.renderRectangle(buttonData.upgrade.transforms.health().add(rt.camera), buttonData.upgrade.shape, new Fill("#6f6f6f", 1), null);
+  rt.renderText(buttonData.upgrade.transforms.health().add(rt.camera), new TextNode("Courier New", "health", 0, (landscape ? cs.w : cs.h) / 35, "center"), new Fill("#6aff00", 1));
+  //speed upgrade
+  rt.renderRectangle(buttonData.upgrade.transforms.regen().add(rt.camera), buttonData.upgrade.shape, new Fill("#6f6f6f", 1), null);
+  rt.renderText(buttonData.upgrade.transforms.regen().add(rt.camera), new TextNode("Courier New", "regen", 0, (landscape ? cs.w : cs.h) / 35, "center"), new Fill("#ff00d9", 1));
 }
