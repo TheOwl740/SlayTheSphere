@@ -99,7 +99,7 @@ const buttonData = {
       regen: () => {return new Pair(cs.w - (cs.w / 8), (cs.h / -2) - (cs.h / 8))},
     },
     shape: new Rectangle(0, cs.h / 8, cs.h / 16),
-    collider: () => {return new Collider(buttonData.exit.transform(), buttonData.exit.shape)}
+    collider: (transform) => {return new Collider(transform, buttonData.upgrade.shape)}
   }
 };
 //button count data
@@ -420,6 +420,7 @@ class Player {
       current: 20,
       max: 20,
       regenTime: 10,
+      regenMax: 10,
       regenPoints: 0
     }
   }
@@ -432,7 +433,7 @@ class Player {
   }
   runTurn() {
     //wait action
-    if(this.targetIndex === null && ((tk.detectCollision(et.cursor, buttonData.stopWait.collider()) && ((landscape ? et.getClick("left") : tapData.realClick))) || et.getKey("z")) && bc.ready()) {
+    if(this.targetIndex === null && ((et.getKey("z") || (tk.detectCollision(et.cursor, buttonData.stopWait.collider()) && (landscape ? et.getClick("left") : tapData.realClick))) && bc.ready())) {
       return new Wait(this);
     }
     //check if at target
@@ -474,9 +475,11 @@ class Player {
     return null;
   }
   turnPing() {
-    this.health.regenPoints--;
-    if(Math.floor(currentTC.turn) % this.health.regenTime === 0 && this.health.current < this.health.max && this.health.regenPoints > 0) {
+    this.health.regenPoints -= this.health.regenPoints > 0 ? 1 : 0;
+    this.health.regenTime -= this.health.regenTime > 0 ? 1 : 0;
+    if(this.health.regenTime < 0 && this.health.current < this.health.max && this.health.regenPoints > 0) {
       this.health.current++;
+      this.health.regenTime = this.health.regenMax;
     }
   }
   damage(attackAction) {
@@ -495,8 +498,6 @@ class Player {
       currentEC.add(new SPEffect(points));
       this.skillPoints += points;
       this.xp -= points * currentLevel.levelCount * 5;
-      this.health.current += points * 5;
-      this.health.max += points * 5;
     } else {
       currentEC.add(new XPEffect(count));
     }
@@ -506,7 +507,7 @@ class Player {
   }
   updateAux() {
     //cancel move operation
-    if(this.targetIndex !== null && ((tk.detectCollision(et.dCursor(rt), new Collider(buttonData.stopWait.transform(), buttonData.stopWait.shape)) && (landscape ? et.getClick("left") : tapData.realClick)) || et.getKey("x")) && bc.ready()) {
+    if(this.targetIndex !== null && ((et.getKey("x") || (tk.detectCollision(et.cursor, buttonData.stopWait.collider()) && (landscape ? et.getClick("left") : tapData.realClick))) && bc.ready())) {
       this.targetIndex = null;
       this.movePath = null;
     }

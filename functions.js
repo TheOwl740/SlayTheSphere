@@ -128,7 +128,7 @@ function updateHUD() {
   rt.renderRectangle(buttonData.skillTree.transform().add(rt.camera), buttonData.skillTree.shape, new Fill("#82846e", 0.5), null);
   rt.renderText(buttonData.skillTree.transform().add(rt.camera), new TextNode("Courier New", "+", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#c4b921", 1));
   //skill tree access
-  if(tk.detectCollision(et.cursor, buttonData.skillTree.collider()) && ((landscape ? et.getClick("left") : tapData.realClick) || et.getKey("q")) && bc.ready()) {
+  if((et.getKey("q") || (tk.detectCollision(et.cursor, buttonData.skillTree.collider()) && (landscape ? et.getClick("left") : tapData.realClick))) && bc.ready()) {
     gameState = "skillTree";
   }
 }
@@ -160,21 +160,50 @@ function updateSkillTree() {
   rt.renderRectangle(buttonData.exit.transform().add(rt.camera), buttonData.exit.shape, new Fill("#82846e", 0.5), null);
   rt.renderText(buttonData.exit.transform().add(rt.camera), new TextNode("Courier New", "x", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#d13c3c", 1));
   //exit button function
-  if(tk.detectCollision(et.cursor, buttonData.exit.collider()) && ((landscape ? et.getClick("left") : tapData.realClick) || et.getKey("x")) && bc.ready()) {
+  if((et.getKey("x") || (tk.detectCollision(et.cursor, buttonData.exit.collider()) && (landscape ? et.getClick("left") : tapData.realClick))) && bc.ready()) {
     gameState = "inGame";
   }
   //main text and points
   rt.renderText(new Pair(cs.w / 2, cs.h / -2).add(rt.camera), new TextNode("Courier New", `Upgrades: ${player.skillPoints}pts`, 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#ffffff", 1));
-  //speed upgrade
+  //speed upgrade render
   rt.renderRectangle(buttonData.upgrade.transforms.speed().add(rt.camera), buttonData.upgrade.shape, new Fill("#6f6f6f", 1), null);
   rt.renderText(buttonData.upgrade.transforms.speed().add(rt.camera), new TextNode("Courier New", "speed", 0, (landscape ? cs.w : cs.h) / 35, "center"), new Fill("#fff200", 1));
+  //button function
+  if((tk.detectCollision(et.cursor, buttonData.upgrade.collider(buttonData.upgrade.transforms.speed())) && (landscape ? et.getClick("left") : tapData.realClick)) && bc.ready()) {
+    if(player.skillPoints > 0) {
+      player.skillPoints--;
+      player.moveTime = Math.floor(player.moveTime * 900) / 1000;
+    }
+  }
   //attack upgrade
   rt.renderRectangle(buttonData.upgrade.transforms.attack().add(rt.camera), buttonData.upgrade.shape, new Fill("#6f6f6f", 1), null);
   rt.renderText(buttonData.upgrade.transforms.attack().add(rt.camera), new TextNode("Courier New", "attack", 0, (landscape ? cs.w : cs.h) / 35, "center"), new Fill("#d13c3c", 1));
-  //speed upgrade
+  //button function
+  if((tk.detectCollision(et.cursor, buttonData.upgrade.collider(buttonData.upgrade.transforms.attack())) && (landscape ? et.getClick("left") : tapData.realClick)) && bc.ready()) {
+    if(player.skillPoints > 0) {
+      player.skillPoints--;
+      player.melee.damage++;
+    }
+  }
+  //health upgrade
   rt.renderRectangle(buttonData.upgrade.transforms.health().add(rt.camera), buttonData.upgrade.shape, new Fill("#6f6f6f", 1), null);
   rt.renderText(buttonData.upgrade.transforms.health().add(rt.camera), new TextNode("Courier New", "health", 0, (landscape ? cs.w : cs.h) / 35, "center"), new Fill("#6aff00", 1));
-  //speed upgrade
+  //button function
+  if((tk.detectCollision(et.cursor, buttonData.upgrade.collider(buttonData.upgrade.transforms.health())) && (landscape ? et.getClick("left") : tapData.realClick)) && bc.ready()) {
+    if(player.skillPoints > 0) {
+      player.skillPoints--;
+      player.health.max += 5;
+      player.health.current += 5;
+    }
+  }
+  //regen upgrade
   rt.renderRectangle(buttonData.upgrade.transforms.regen().add(rt.camera), buttonData.upgrade.shape, new Fill("#6f6f6f", 1), null);
   rt.renderText(buttonData.upgrade.transforms.regen().add(rt.camera), new TextNode("Courier New", "regen", 0, (landscape ? cs.w : cs.h) / 35, "center"), new Fill("#ff00d9", 1));
+  //button function
+  if((tk.detectCollision(et.cursor, buttonData.upgrade.collider(buttonData.upgrade.transforms.regen())) && (landscape ? et.getClick("left") : tapData.realClick)) && bc.ready()) {
+    if(player.skillPoints > 0) {
+      player.skillPoints--;
+      player.health.regenMax = Math.floor(player.health.regenMax * 900) / 1000;
+    }
+  }
 }
