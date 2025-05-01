@@ -477,7 +477,7 @@ class Player {
   turnPing() {
     this.health.regenPoints -= this.health.regenPoints > 0 ? 1 : 0;
     this.health.regenTime -= this.health.regenTime > 0 ? 1 : 0;
-    if(this.health.regenTime < 0 && this.health.current < this.health.max && this.health.regenPoints > 0) {
+    if(this.health.regenTime <= 0 && this.health.current < this.health.max && this.health.regenPoints > 0) {
       this.health.current++;
       this.health.regenTime = this.health.regenMax;
     }
