@@ -4,6 +4,10 @@ function update() {
   ec++;
   //update button count
   bc.update();
+  //update tap control
+  if(!landscape) {
+    tapData.update();
+  }
   switch(gameState) {
     case "homescreen":
       updateHomescreen()

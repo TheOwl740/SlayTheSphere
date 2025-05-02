@@ -14,11 +14,7 @@ function updateGame() {
   //update player controls
   player.updateAux();
   //update effects
-  currentEC.update();
-  //update tap controller
-  if(!landscape) {
-    tapData.update();
-  }
+  currentEC.update();  
 }
 //renders and updates button on homescreen
 function updateHomescreen() {
@@ -234,7 +230,7 @@ function updateTutorial() {
   rt.renderText(new Pair(cs.w / 2, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 10)), new TextNode("Courier New", "Even explored tiles can hide enemies if out of view", 0, landscape ? cs.w / 50 : cs.h / 75, "center"), new Fill("#EEEEFF", 1));
   rt.renderText(new Pair(cs.w / 2, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 11)), new TextNode("Courier New", "Need to wait a turn? Perform a wait action (z button)", 0, landscape ? cs.w / 50 : cs.h / 75, "center"), new Fill("#EEEEFF", 1));
   rt.renderText(new Pair(cs.w / 2, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 12)), new TextNode("Courier New", "Regen requires recently gained xp- can't run forever", 0, landscape ? cs.w / 50 : cs.h / 75, "center"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w / 2, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 13)), new TextNode("Courier New", "Attacking an enemy that just spotted you deals a crit", 0, landscape ? cs.w / 50 : cs.h / 75, "center"), new Fill("#EEEEFF", 1));
+  rt.renderText(new Pair(cs.w / 2, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 13)), new TextNode("Courier New", "Wrap enemies around corners to surprise attack", 0, landscape ? cs.w / 50 : cs.h / 75, "center"), new Fill("#EEEEFF", 1));
   //exit button render
   rt.renderRectangle(buttonData.exit.transform().add(rt.camera), buttonData.exit.shape, new Fill("#82846e", 0.5), null);
   rt.renderText(buttonData.exit.transform().add(rt.camera), new TextNode("Courier New", "x", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#d13c3c", 1));
