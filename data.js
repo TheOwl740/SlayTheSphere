@@ -335,8 +335,8 @@ class Movement extends Action {
   update() {
     //on start
     if(this.remainingDuration === this.duration) {
-      //set active tile
-      this.actor.tile = this.targetTile;
+      //update tile relationship
+      updateTERelationship(this.actor.tile, this.actor, this.targetTile);
       //face right direction
       this.actor.shape.r = this.moveDirection;
     }
@@ -352,7 +352,8 @@ class Movement extends Action {
     }
   }
   complete() {
-    this.actor.tile = this.targetTile;
+    //update tile relationship
+    updateTERelationship(this.actor.tile, this.actor, this.targetTile);
     this.actor.transform = this.targetTile.transform.duplicate();
     this.actor.shape.r = this.moveDirection;
   }
@@ -407,7 +408,7 @@ class Player {
       tk.calcRotationalTranslate(240, tileSize / 3)
     ], 0);
     this.fill = new Fill("#6262e7", 1);
-    this.tile = currentLevel.getTile(transform);
+    this.tile;
     this.movePath = null;
     this.targetIndex = null;
     this.nextTurn = 0;
@@ -429,6 +430,7 @@ class Player {
       regenMax: 10,
       regenPoints: 0
     }
+    updateTERelationship(null, this, currentLevel.getTile(transform))
   }
   collider() {
     return new Collider(player.transform, player.shape);
@@ -524,7 +526,8 @@ class Enemy {
   constructor(transform, shape, tile) {
     this.transform = transform;
     this.shape = shape;
-    this.tile = tile;
+    this.tile;
+    updateTERelationship(null, this, tile);
   }
   collider() {
     return new Collider(this.transform, this.shape);
@@ -709,6 +712,7 @@ class Floor extends Tile {
     super(transform, index);
     this.type = "floor"
     this.walkable = true;
+    this.entity = null;
     this.fill = new Fill("#343434", 1);
     this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
   }
@@ -922,61 +926,27 @@ class Level {
     for(let ti = 0; ti < 2500; ti++) {
       this.map[Math.floor(ti / 50)][ti % 50].visible = false;
     }
+    //set of tile indices with finished lighting
+    const closed = new Set();
     //key function
     function toKey(index) {
       return index.x + "," + index.y;
     }
-    //set of tile indices with finished lighting
-    const closed = new Set();
-    //array of light nodes ready to be evaluated, initialized at player index
-    const open = [new LightNode(0, player.tile.index.duplicate())];
-    //current node being evaluated
-    let current;
-    //loops until all open are closed
-    while(open.length > 0) {
-      //sort lowest dist first
-      open.sort((a, b) => {
-        return a.distance - b.distance;
-      });
-      //set current open
-      current = open[0];
-      //light tile on map
-      this.map[current.index.x][current.index.y].revealed = true;
-      this.map[current.index.x][current.index.y].visible = true;
-      //close & delete that open
-      open.shift();
-      closed.add(toKey(current.index))
-      //add new opens to list
-      for(let x = -1; x <= 1; x++) {
-        for(let y = -1; y <= 1; y++) {
-          if(!(x === 0 && y === 0)) {
-            //setup new index
-            let newIndex = current.index.duplicate().add(new Pair(x, y));
-            let newDist = current.distance + currentPC.octile(current.index, newIndex);
-            //check to see if already opened
-            open.forEach((openNode) => {
-              if(newIndex !== null && openNode.index.isEqualTo(newIndex)) {
-                newIndex = null;
-              }
-            });
-            //if unopened and close enough, add to open
-            if(newIndex !== null && newDist < 6 && !closed.has(toKey(newIndex))) {
-              let towardPlayerIndex = newIndex.duplicate();
-              if(player.tile.index.x !== newIndex.x) {
-                towardPlayerIndex.x += player.tile.index.x < newIndex.x ? -1 : 1
-              }
-              if(player.tile.index.y !== newIndex.y) {
-                towardPlayerIndex.y += player.tile.index.y < newIndex.y ? -1 : 1
-              }
-              if(this.map[newIndex.x][newIndex.y].type === "wall") {
-                //unshadow walls
-                this.map[newIndex.x][newIndex.y].revealed = true;
-                this.map[newIndex.x][newIndex.y].visible = true;
-              } else if(this.map[towardPlayerIndex.x][towardPlayerIndex.y].type !== "wall") {
-                open.push(new LightNode(newDist, newIndex));
-              }
-            }
+    //circle around player with tile casts
+    for(let angle = 0; angle < 360; angle += 5) {
+      //mini raycast
+      for(let d = 0; d < 6; d++) {
+        let activeTile = rotationalTile(player.tile.index, angle, d);
+        if(activeTile?.type !== "wall") {
+          if(!closed.has(toKey(activeTile?.index))) {
+            activeTile.revealed = true;
+            activeTile.visible = true;
+            closed.add(toKey(activeTile.index));
           }
+        } else if(activeTile?.type === "wall") {
+          activeTile.revealed = true;
+          activeTile.visible = true;
+          break;
         }
       }
     }

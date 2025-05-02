@@ -77,7 +77,7 @@ function loadNewLevel() {
       player = new Player(currentLevel.playerSpawn)
     } else {
       player.transform = currentLevel.playerSpawn;
-      player.tile = currentLevel.getTile(player.transform);
+      updateTERelationship(null, player, currentLevel.getTile(currentLevel.playerSpawn));
       player.movePath = null;
     }
     //initialize turn controller data
@@ -241,5 +241,16 @@ function updateTutorial() {
   if((et.getKey("x") || (tk.detectCollision(et.cursor, buttonData.exit.collider()) && (landscape ? et.getClick("left") : tapData.realClick))) && bc.ready()) {
     gameState = "homescreen";
   }
-  
+}
+//updates the relationship between entity and tile
+function updateTERelationship(oldTile, entity, newTile) {
+  if(oldTile) {
+    oldTile.entity = null;
+  }
+  entity.tile = newTile;
+  newTile.entity = entity;
+}
+//rotational translate for whole indices
+function rotationalTile(index, angle, magnitude) {
+  return currentLevel.getIndex((index.duplicate().add(tk.calcRotationalTranslate(angle, magnitude))).round(0))
 }
