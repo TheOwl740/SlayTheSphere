@@ -254,3 +254,13 @@ function updateTERelationship(oldTile, entity, newTile) {
 function rotationalTile(index, angle, magnitude) {
   return currentLevel.getIndex((index.duplicate().add(tk.calcRotationalTranslate(angle, magnitude))).round(0))
 }
+//tile based raycast, blocked by nonwalkables
+function raycast(originIndex, targetIndex) {
+  let angle = tk.calcAngle(originIndex, targetIndex)
+  for(let seg = 0; seg < Math.round(currentPC.octile(originIndex, targetIndex)); seg++) {
+    if(rotationalTile(originIndex, angle, seg)?.type === "wall") {
+      return false;
+    }
+  }
+  return true;
+}

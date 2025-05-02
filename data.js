@@ -608,7 +608,7 @@ class Cube extends Enemy {
         return new Wait(this);
       case "wandering":
         //open attack if close; will run to next switch
-        if(octileToPlayer < 5) {
+        if(octileToPlayer < 5 && raycast(this.tile.index, player.tile.index)) {
           this.state = "attacking";
           this.targetIndex = null;
           this.path = null;
@@ -644,7 +644,7 @@ class Cube extends Enemy {
         return null;
       case "attacking":
         //wait and reset if target out of range
-        if(currentPC.octile(player.tile.index, this.tile.index) > 9) {
+        if(currentPC.octile(player.tile.index, this.tile.index) > 9 || !raycast(this.tile.index, player.tile.index)) {
           this.state = "wandering";
           this.targetIndex = null;
           this.path = null;
