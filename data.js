@@ -166,7 +166,7 @@ class DamageNumber extends Effect {
   update() {
     this.remainingDuration--;
     if(this.sourceAttack.actor.tile.visible) {
-      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, (landscape ? cs.w / 50 : cs.h / 35), "center"), new Fill("#561919", this.remainingDuration / 60));
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, (landscape ? cs.w / 50 : cs.h / 35), "center"), new Fill(this.sourceAttack.surprise ? "#ffff00" : "#561919", this.remainingDuration / 60));
     }
   }
 }
@@ -364,7 +364,12 @@ class Melee extends Action {
     this.type = "attack";
     this.targetEntity = targetEntity;
     this.damage = actor.melee.getHit();
+    this.surprise = false;
     this.attackDirection = tk.calcAngle(this.actor.transform, this.targetEntity.transform);
+    if(targetEntity.type !== "player" && !targetEntity.playerLock) {
+      this.damage = Math.floor(this.damage * 1.5);
+      this.surprise = true;
+    }
   }
   update() {
     //on start
@@ -416,6 +421,7 @@ class Player {
     this.levelCount = 1;
     this.xp = 0;
     this.skillPoints = 0;
+    this.lastPosition;
     this.melee = {
       time: 1,
       damage: 7,
@@ -440,6 +446,8 @@ class Player {
     rt.renderShape(this.transform, this.shape, this.fill, new Border("#4b4be7", 1, 3 * sinMultiplier, "round"));
   }
   runTurn() {
+    //set last position
+    this.lastPosition = this.tile.index;
     //wait action
     if(this.targetIndex === null && ((et.getKey("z") || (tk.detectCollision(et.cursor, buttonData.stopWait.collider()) && (landscape ? et.getClick("left") : tapData.realClick))) && bc.ready())) {
       return new Wait(this);
@@ -500,7 +508,7 @@ class Player {
   }
   addXP(count) {
     this.xp += count;
-    this.health.regenPoints += count * 3;
+    this.health.regenPoints += count * 10;
     let points = Math.floor(this.xp / 20)
     if(points > 0) {
       currentEC.add(new SPEffect(points));
@@ -538,6 +546,8 @@ class Sphere extends Enemy {
     super(transform, new Circle(tileSize * 2), tile);
     this.type = "sphere"
     this.fill = new Fill("#e0a204", 1);
+    this.playerLock = true;
+    this.xpValue = tk.randomNum(10, 20);
     this.health = {
       current: 10 * levelCount,
       max: 10 * levelCount
@@ -557,6 +567,7 @@ class Sphere extends Enemy {
     this.health.current -= attackAction.damage;
     if(this.health.current < 1) {
       gameState = "loading";
+      player.addXP(this.xpValue);
     }
   }
 }
@@ -571,6 +582,7 @@ class Cube extends Enemy {
     this.targetIndex = null;
     this.path = null;
     this.xpValue = tk.randomNum(3, 6);
+    this.chaseTime = 0;
     this.melee = {
       time: 1,
       damage: 3,
@@ -597,6 +609,7 @@ class Cube extends Enemy {
 
   }
   runTurn() {
+    this.playerLock = raycast(this.tile.index, player.tile.index);
     let octileToPlayer = currentPC.octile(player.tile.index, this.tile.index);
     switch(this.state) {
       case "sleeping":
@@ -645,13 +658,14 @@ class Cube extends Enemy {
       case "attacking":
         //wait and reset if target out of range
         if(currentPC.octile(player.tile.index, this.tile.index) > 9 || !raycast(this.tile.index, player.tile.index)) {
-          this.state = "wandering";
-          this.targetIndex = null;
-          this.path = null;
+          this.state = "chasing";
+          this.targetIndex = player.lastPosition;
+          this.updatePath();
+          this.chaseTime = 0;
           return new Wait(this);
         } else {
           //retarget
-          this.targetIndex = player.tile.index;
+          this.targetIndex = player.lastPosition;
           this.updatePath();
           if(this.path === null) {
             this.targetIndex = null;
@@ -664,6 +678,26 @@ class Cube extends Enemy {
           } else {
             return new Movement(this, currentLevel.getIndex(this.path[0]));
           }
+        }
+      case "chasing":
+        if(this.chaseTime > 5) {
+          this.state = "wandering";
+          this.targetIndex = null;
+          this.path = null;
+          return new Wait(this);
+        } else if(octileToPlayer < 5 && raycast(this.tile.index, player.tile.index)) {
+          this.state = "attacking";
+          this.targetIndex = null;
+          this.path = null;
+          return null;
+        } else {
+          this.chaseTime++;
+          this.updatePath();
+          if(this.path === null) {
+            this.targetIndex = null;
+            return null;
+          }   
+          return new Movement(this, currentLevel.getIndex(this.path[0]));
         }
     }
     //backup return
@@ -691,7 +725,7 @@ class Wall extends Tile {
     super(transform, index);
     this.type = "wall"
     this.walkable = false;
-    this.fill = new Fill("#171717", 1);
+    this.fill = new Fill("#222222", 1);
     this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
   }
   collider() {
@@ -713,7 +747,7 @@ class Floor extends Tile {
     this.type = "floor"
     this.walkable = true;
     this.entity = null;
-    this.fill = new Fill("#343434", 1);
+    this.fill = new Fill("#535353", 1);
     this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
   }
   collider() {
