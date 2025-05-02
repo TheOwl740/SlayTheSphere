@@ -417,9 +417,9 @@ class Player {
     this.skillPoints = 0;
     this.melee = {
       time: 1,
-      damage: 5,
+      damage: 7,
       getHit: () => {
-        return this.melee.damage + tk.randomNum(Math.floor(this.melee.damage / -3), Math.floor(this.melee.damage / 3));
+        return tk.randomNum(Math.floor(this.melee.damage * 0.6), Math.floor(this.melee.damage * 1.4));
       }
     };
     this.health = {
@@ -570,9 +570,9 @@ class Cube extends Enemy {
     this.xpValue = tk.randomNum(3, 6);
     this.melee = {
       time: 1,
-      damage: 5,
+      damage: 3,
       getHit: () => {
-        return this.melee.damage + tk.randomNum(Math.floor(this.melee.damage / -3), Math.floor(this.melee.damage / 3));
+        return tk.randomNum(Math.floor(this.melee.damage * 0.6), Math.floor(this.melee.damage * 1.4));
       }
     };
     this.health = {
