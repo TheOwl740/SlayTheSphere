@@ -22,6 +22,9 @@ function update() {
     case "gameOver":
       updateFailscreen();
       break;
+    case "tutorial":
+      updateTutorial();
+      break;
   }
 }
 

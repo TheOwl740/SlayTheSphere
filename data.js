@@ -36,6 +36,7 @@ const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 15);
 let loadStarted = false;
 
 //OBJECTS
+
 //mobile drag controller
 const tapData = {
   holdTime: 0,
@@ -100,6 +101,11 @@ const buttonData = {
     },
     shape: new Rectangle(0, cs.h / 8, cs.h / 16),
     collider: (transform) => {return new Collider(transform, buttonData.upgrade.shape)}
+  },
+  tutorial: {
+    transform: () => {return new Pair(cs.w / 2, cs.h * -0.75)},
+    shape: new Rectangle(0, cs.h / 4, cs.h / 12),
+    collider: () => {return new Collider(buttonData.tutorial.transform(), buttonData.tutorial.shape)}
   }
 };
 //button count data
@@ -207,10 +213,10 @@ class NewLevelEffect extends Effect {
     this.remainingDuration--;
     if(this.remainingDuration > 150) {
       rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, (cs.w / 10) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
-      rt.renderText(this.transform.duplicate().subtract(new Pair(0, cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, (cs.w / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, (cs.w / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
     } else {
       rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, cs.w / 10, "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
-      rt.renderText(this.transform.duplicate().subtract(new Pair(0, cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, (cs.w / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, (cs.w / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
     }
   }
 }
@@ -493,11 +499,11 @@ class Player {
   addXP(count) {
     this.xp += count;
     this.health.regenPoints += count * 3;
-    let points = Math.floor(this.xp / (currentLevel.levelCount * 5))
+    let points = Math.floor(this.xp / 20)
     if(points > 0) {
       currentEC.add(new SPEffect(points));
       this.skillPoints += points;
-      this.xp -= points * currentLevel.levelCount * 5;
+      this.xp -= points * 20;
     } else {
       currentEC.add(new XPEffect(count));
     }
