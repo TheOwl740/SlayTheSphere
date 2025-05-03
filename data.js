@@ -456,6 +456,7 @@ class Player {
     if(this.targetIndex?.isEqualTo(this.tile.index)) {
       this.targetIndex = null;
       this.movePath = null;
+      rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2));
     }
     //if there is no target and there is a targeting click
     if(this.targetIndex === null && (landscape ? et.getClick("left") : tapData.realClick)) {

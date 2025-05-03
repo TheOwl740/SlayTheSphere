@@ -215,10 +215,10 @@ class TextNode {
     [this.r, this.size] = [r, size];
     //fixes mysterious reversal of alignment
     switch(alignment) {
-      case "left":
+      case "right":
         this.alignment = "right";
         break;
-      case "right":
+      case "left":
         this.alignment = "left";
         break;
       default:
