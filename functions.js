@@ -214,8 +214,8 @@ function updateTutorial() {
   //canvas clear
   cs.fillAll(new Fill("#000000", 1));
   //background circle
-  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 2) * (((Math.sin(ec / 50) + 1) / 8) + 1)), new Fill("#10b938", (Math.sin(ec / 50) + 2) / 4), null);
-  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 3) * (((Math.sin(ec / 25) + 1) / 8) + 1)), new Fill("#10b938", (Math.sin(ec / 25) + 2) / 4), null);
+  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 2) * (((Math.sin(ec / 50) + 1) / 8) + 1)), new Fill("#0a6f22", (Math.sin(ec / 50) + 2) / 4), null);
+  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 3) * (((Math.sin(ec / 25) + 1) / 8) + 1)), new Fill("#0a6f22", (Math.sin(ec / 25) + 2) / 4), null);
   //text rendering
   rt.renderText(new Pair(cs.w / 2, cs.h / -15), new TextNode("Courier New", "How To Play", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
   rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 1)), new TextNode("Courier New", "Slay The Sphere is a turn based dungeon crawler", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
