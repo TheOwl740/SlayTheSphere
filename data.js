@@ -987,6 +987,8 @@ class Level {
           activeTile.revealed = true;
           activeTile.visible = true;
           break;
+        } else {
+          break;
         }
       }
     }
