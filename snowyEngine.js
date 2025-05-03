@@ -225,6 +225,10 @@ class TextNode {
         this.alignment = "center";
     }
   }
+  measure(rt) {
+    rt.canvas.cx.font = `${this.size / rt.zoom}px ${this.font}`;
+    return rt.canvas.cx.measureText(this.text).width;
+  }
 }
 
 //circle data for renderers
