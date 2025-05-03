@@ -157,7 +157,7 @@ function updateFailscreen() {
 }
 function updateSkillTree() {
   //clear canvas
-  cs.fillAll("#000000", 1)
+  cs.fillAll(new Fill("#000000", 1))
   //exit button render
   rt.renderRectangle(buttonData.exit.transform().add(rt.camera), buttonData.exit.shape, new Fill("#82846e", 0.5), null);
   rt.renderText(buttonData.exit.transform().add(rt.camera), new TextNode("Courier New", "x", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#d13c3c", 1));
