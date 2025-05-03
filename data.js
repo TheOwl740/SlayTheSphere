@@ -456,7 +456,6 @@ class Player {
     if(this.targetIndex?.isEqualTo(this.tile.index)) {
       this.targetIndex = null;
       this.movePath = null;
-      rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2));
     }
     //if there is no target and there is a targeting click
     if(this.targetIndex === null && (landscape ? et.getClick("left") : tapData.realClick)) {
@@ -622,7 +621,7 @@ class Cube extends Enemy {
         return new Wait(this);
       case "wandering":
         //open attack if close; will run to next switch
-        if(octileToPlayer < 5 && raycast(this.tile.index, player.tile.index)) {
+        if(octileToPlayer <= currentLevel.visionRange && this.playerLock) {
           this.state = "attacking";
           this.targetIndex = null;
           this.path = null;
@@ -658,7 +657,7 @@ class Cube extends Enemy {
         return null;
       case "attacking":
         //wait and reset if target out of range
-        if(currentPC.octile(player.tile.index, this.tile.index) > 9 || !raycast(this.tile.index, player.tile.index)) {
+        if(octileToPlayer > currentLevel.visionRange || !this.playerLock) {
           this.state = "chasing";
           this.targetIndex = player.lastPosition;
           this.updatePath();
@@ -686,18 +685,23 @@ class Cube extends Enemy {
           this.targetIndex = null;
           this.path = null;
           return new Wait(this);
-        } else if(octileToPlayer < 5 && raycast(this.tile.index, player.tile.index)) {
+        } else if(octileToPlayer <= currentLevel.visionRange && this.playerLock) {
           this.state = "attacking";
           this.targetIndex = null;
           this.path = null;
           return null;
         } else {
           this.chaseTime++;
+          this.targetIndex = player.lastPosition;
           this.updatePath();
           if(this.path === null) {
+            this.targetIndex = player.tile.index;
+            this.updatePath();
+          }
+          if(this.path === null) {
             this.targetIndex = null;
-            return null;
-          }   
+            return new Wait(this);
+          } 
           return new Movement(this, currentLevel.getIndex(this.path[0]));
         }
     }
@@ -779,6 +783,7 @@ class Level {
     this.enemies = [];
     this.playerSpawn = null;
     this.sphere = null;
+    this.visionRange = tk.randomNum(3, 6)
     this.levelCount = levelCount;
     //fill map with walls
     for(let i = 0; i < 50; i++) {
@@ -970,7 +975,7 @@ class Level {
     //circle around player with tile casts
     for(let angle = 0; angle < 360; angle += 5) {
       //mini raycast
-      for(let d = 0; d < 6; d++) {
+      for(let d = 0; d < this.visionRange; d++) {
         let activeTile = rotationalTile(player.tile.index, angle, d);
         if(activeTile?.type !== "wall") {
           if(!closed.has(toKey(activeTile?.index))) {
