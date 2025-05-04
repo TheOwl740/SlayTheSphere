@@ -977,7 +977,7 @@ class Level {
       //mini raycast
       for(let d = 0; d < this.visionRange; d++) {
         let activeTile = rotationalTile(player.tile.index, angle, d);
-        if(activeTile?.type !== "wall") {
+        if(activeTile !== null && activeTile?.type !== "wall") {
           if(!closed.has(toKey(activeTile?.index))) {
             activeTile.revealed = true;
             activeTile.visible = true;
