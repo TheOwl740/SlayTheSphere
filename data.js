@@ -173,7 +173,7 @@ class DamageNumber extends Effect {
 //xp gain effect
 class XPEffect extends Effect {
   constructor(xpCount) {
-    super(60, player.transform);
+    super(60, player.transform.duplicate().add(new Pair(0, tileSize)));
     this.xpCount = xpCount;
   }
   update() {
@@ -422,6 +422,7 @@ class Player {
     this.xp = 0;
     this.skillPoints = 0;
     this.lastPosition;
+    this.forceMove = false;
     this.melee = {
       time: 1,
       damage: 7,
@@ -456,14 +457,26 @@ class Player {
     if(this.targetIndex?.isEqualTo(this.tile.index)) {
       this.targetIndex = null;
       this.movePath = null;
+      this.forceMove = false;
     }
+    //check for new enemies in sight
+    let visibleEnemies = false;
+    currentLevel.enemies.forEach((enemy) => {
+      if(raycast(this.tile.index, enemy.tile.index) && enemy.tile.visible) {
+        if(this.movePath !== null && !this.forceMove) {
+          this.targetIndex = this.movePath[0];
+        }
+        visibleEnemies = true;
+      }
+    });
     //if there is no target and there is a targeting click
     if(this.targetIndex === null && (landscape ? et.getClick("left") : tapData.realClick)) {
       //get tile at click
       let clickedTile = currentLevel.getTile(et.dCursor(rt));
       //if valid tile
       if(clickedTile?.type === "floor" && clickedTile?.revealed) {
-        this.targetIndex = clickedTile.index
+        this.targetIndex = clickedTile.index;
+        this.forceMove = visibleEnemies;
       }
     //if there is a target
     } else if(this.targetIndex !== null) {
@@ -471,6 +484,7 @@ class Player {
       this.updatePath();
       if(this.movePath === null) {
         this.targetIndex = null;
+        this.forceMove = false;
         return null;
       }
       //check against sphere
@@ -502,6 +516,7 @@ class Player {
     this.health.current -= attackAction.damage;
     this.targetIndex = null;
     this.movePath = null;
+    this.forceMove = false;
     if(this.health.current < 1) {
       gameState = "gameOver";
     }
