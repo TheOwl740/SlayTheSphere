@@ -462,7 +462,7 @@ class Player {
     //check for new enemies in sight
     let visibleEnemies = false;
     currentLevel.enemies.forEach((enemy) => {
-      if(raycast(this.tile.index, enemy.tile.index) && enemy.tile.visible) {
+      if((!raycast(this.tile.index, enemy.tile.index)) && enemy.tile.visible) {
         if(this.movePath !== null && !this.forceMove) {
           this.targetIndex = this.movePath[0];
         }
@@ -624,7 +624,7 @@ class Cube extends Enemy {
 
   }
   runTurn() {
-    this.playerLock = raycast(this.tile.index, player.tile.index);
+    this.playerLock = !raycast(this.tile.index, player.tile.index);
     let octileToPlayer = currentPC.octile(player.tile.index, this.tile.index);
     switch(this.state) {
       case "sleeping":

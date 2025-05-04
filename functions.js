@@ -256,8 +256,8 @@ function raycast(originIndex, targetIndex) {
   let angle = tk.calcAngle(originIndex, targetIndex)
   for(let seg = 0; seg < Math.round(currentPC.octile(originIndex, targetIndex)); seg++) {
     if(rotationalTile(originIndex, angle, seg)?.type === "wall") {
-      return false;
+      return rotationalTile(originIndex, angle, seg);
     }
   }
-  return true;
+  return false;
 }
