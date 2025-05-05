@@ -470,11 +470,11 @@ class Player {
       }
     });
     //if there is no target and there is a targeting click
-    if(this.targetIndex === null && (landscape ? et.getClick("left") : tapData.realClick)) {
+    if(this.targetIndex === null && (landscape ? et.getClick("left") : tapData.realClick) && bc.ready()) {
       //get tile at click
       let clickedTile = currentLevel.getTile(et.dCursor(rt));
       //if valid tile
-      if(clickedTile?.type === "floor" && clickedTile?.revealed) {
+      if(clickedTile?.type !== "wall" && clickedTile?.revealed) {
         this.targetIndex = clickedTile.index;
         this.forceMove = visibleEnemies;
       }
@@ -625,18 +625,18 @@ class Cube extends Enemy {
   }
   runTurn() {
     this.playerLock = !raycast(this.tile.index, player.tile.index);
-    let octileToPlayer = currentPC.octile(player.tile.index, this.tile.index);
+    let heuristicToPlayer = currentPC.heuristic(player.tile.index, this.tile.index);
     switch(this.state) {
       case "sleeping":
         //if sleeping, attempt to break out
-        if(tk.randomNum(0, octileToPlayer) < 2) {
+        if(tk.randomNum(0, heuristicToPlayer) < 2) {
           this.state = "wandering";
         }
         //send wait
         return new Wait(this);
       case "wandering":
         //open attack if close; will run to next switch
-        if(octileToPlayer <= currentLevel.visionRange && this.playerLock) {
+        if(heuristicToPlayer <= currentLevel.visionRange && this.playerLock) {
           this.state = "attacking";
           this.targetIndex = null;
           this.path = null;
@@ -672,7 +672,7 @@ class Cube extends Enemy {
         return null;
       case "attacking":
         //wait and reset if target out of range
-        if(octileToPlayer > currentLevel.visionRange || !this.playerLock) {
+        if(heuristicToPlayer > currentLevel.visionRange || !this.playerLock) {
           this.state = "chasing";
           this.targetIndex = player.lastPosition;
           this.updatePath();
@@ -687,7 +687,7 @@ class Cube extends Enemy {
             return null;
           }          
           //attack if close
-          if(octileToPlayer < 2) {
+          if(heuristicToPlayer < 2) {
             return new Melee(this, player);
           //move closer otherwise
           } else {
@@ -700,7 +700,7 @@ class Cube extends Enemy {
           this.targetIndex = null;
           this.path = null;
           return new Wait(this);
-        } else if(octileToPlayer <= currentLevel.visionRange && this.playerLock) {
+        } else if(heuristicToPlayer <= currentLevel.visionRange && this.playerLock) {
           this.state = "attacking";
           this.targetIndex = null;
           this.path = null;
@@ -735,7 +735,7 @@ class Tile {
     this.transform = transform;
     this.index = index;
     this.shape = new Rectangle(0, tileSize, tileSize);
-    this.revealed = false;
+    this.revealed = true;
     this.visible = false;
   }
 }
@@ -782,150 +782,249 @@ class Floor extends Tile {
     }
   }
 }
-//light node for shading
-class LightNode {
-  constructor(distance, index) {
+class Door extends Tile {
+  constructor(transform, index, vertical, parentRoom) {
+    super(transform, index);
+    this.type = "door"
+    this.walkable = true;
+    this.entity = null;
+    this.parentRoom = parentRoom;
+    this.vertical = vertical;
+    this.fill = new Fill("#7c6315", 1);
+    this.fFill = new Fill("#535353", 1);
+    this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
+  }
+  collider() {
+    return new Collider(this.transform, this.shape);
+  }
+  render() {
+    if(this.revealed) {
+      rt.renderRectangle(this.transform, this.shape, this.fFill, this.border);
+      if(this.entity === null) {
+        rt.renderRectangle(this.transform, this.dShape(), this.fill, this.border);
+      } else {
+        rt.renderRectangle(this.vertical ? this.transform.duplicate().add(new Pair(0, tileSize / 3)) : this.transform.duplicate().add(new Pair(tileSize / 3, 0)), this.dShape(), this.fill, this.border);
+      }
+      if(!this.visible) {
+        rt.renderRectangle(this.transform, this.shape, new Fill("#000000", 0.3), null);
+      }
+    }
+  }
+  dShape() {
+    if(this.vertical) {
+      return new Rectangle(this.entity === null ? 0 : 90, tileSize / 3, tileSize);
+    } else {
+      return new Rectangle(this.entity === null ? 0 : 90, tileSize, tileSize / 3);
+    }
+  }
+}
+//room class containing subsets of tiles
+class Room {
+  constructor(level, index, dimensions) {
+    this.type = "room";
+    this.level = level;
+    this.dimensions = dimensions;
     this.index = index;
-    this.distance = distance;
+    this.doors = [];
+    this.centerIndex = level.getIndex(new Pair(Math.floor(this.dimensions.x / 2), Math.floor(this.dimensions.y / 2)).add(index))?.index;
+  }
+  stamp() {
+    //invalid checker
+    if(this.centerIndex === null) {
+      return false;
+    }
+    for(let x = 0; x < this.dimensions.x; x++) {
+      for(let y = 0; y < this.dimensions.y; y++) {
+        let activeTile = this.level.getIndex(new Pair(x, y).add(this.index));
+        if(activeTile === null || activeTile.type === "floor") {
+          return false;
+        }
+      }
+    }
+    //stamp floors
+    for(let x = 1; x < this.dimensions.x - 1; x++) {
+      for(let y = 1; y < this.dimensions.y - 1; y++) {
+        let activeTile = this.level.getIndex(new Pair(x, y).add(this.index));
+        this.level.map[x + this.index.x][y + this.index.y] = new Floor(activeTile.transform, activeTile.index);
+      }
+    }
+    //cast doors
+    let maxDoors = tk.randomNum(2, Math.floor(tk.calcDistance(this.dimensions, new Pair(0, 0))) / 4);
+    maxDoors = maxDoors < 2 ? 2 : maxDoors;
+    let dc = 0;
+    //loop until sufficient doors or over loop limit
+    while(dc < maxDoors) {
+      //setup variables
+      let rch = null;
+      let angle = tk.randomNum(0, 30) * 12;
+      //raycast
+      for(let seg = 0; seg < 50; seg++) {
+        let activeTile = this.level.getIndex((this.centerIndex.duplicate().add(tk.calcRotationalTranslate(angle, seg))).round(0));
+        if(activeTile !== null && (activeTile.type === "wall" || (activeTile.type === "door" && activeTile.entity !== null))) {
+          //break on wall or door hit
+          rch = activeTile;
+          break;
+        }
+      }
+      //backup continue
+      if(rch === null) {
+        continue;
+      }
+      //assign verticality
+      let vertical = rch.index.x === this.index.x || rch.index.x === this.index.x + (this.dimensions.x - 1);
+      let nonAdjacent = true;
+      //check for adjacent doors
+      this.doors.forEach((door) => {
+        if(tk.calcDistance(rch.index, door.index) < 2) {
+          nonAdjacent = false;
+        }
+      });
+      //check for corners
+      if(nonAdjacent && !(rch.index.isEqualTo(this.index) || rch.index.isEqualTo(this.index.duplicate().add(this.dimensions).subtract(new Pair(1, 1))) || rch.index.isEqualTo(this.index.duplicate().add(new Pair(this.dimensions.x - 1, 0)))  || rch.index.isEqualTo(this.index.duplicate().add(new Pair(0, this.dimensions.y - 1))))) {
+        //assign door if available
+        if(rch?.type === "wall") {
+          this.level.map[rch.index.x][rch.index.y] = new Door(rch.transform, rch.index, vertical, this);
+          dc++;
+          this.doors.push(this.level.getIndex(rch.index));
+        }
+      }
+    }
+    //validate
+    return true;
+  }
+  includesIndex(index) {
+    return (index.x >= this.index.x && index.x < this.index.x + this.dimensions.x && index.y >= this.index.y && index.y < this.index.y + this.dimensions.y) && this.level.getIndex(index).type !== "door";
   }
 }
 //map and level dependents class
 class Level {
   constructor(levelCount) {
     //data initialization
+    this.type = "level";
     this.map = [];
-    this.items = [];
     this.enemies = [];
+    this.rooms = [];
     this.playerSpawn = null;
     this.sphere = null;
     this.visionRange = tk.randomNum(3, 6)
     this.levelCount = levelCount;
-    //fill map with walls
+
+    //map generation
+    //populate map with walls
     for(let i = 0; i < 50; i++) {
       this.map.push([]);
       for(let ii = 0; ii < 50; ii++) {
         this.map[i][ii] = new Wall(new Pair((i - 25) * (tileSize - 1), (ii - 25) * (tileSize - 1)), new Pair(i, ii));
       }
     }
-    //list of validated rooms
-    let rooms = [];
-    //total attempts
-    let spawnAttempts = 0;
-    //room creation vars
-    let checkIndex = null;
-    let dimensions = null;
-    let checkFailed = null;
-    //room count is variable, but maxes out at 10 + level, has a minimum of 2 rooms, and will halt after 1000 spawn attempts and minimum reached
-    while(rooms.length < (2 + this.levelCount) && (spawnAttempts < 1000 || rooms.length < 2)) {
-      //increment spawn attempts
-      spawnAttempts++;
-      //set room dimensions to odd numbers between 3 and 9
-      dimensions = new Pair(1 + (tk.randomNum(1, 4) * 2), 1 + (tk.randomNum(1, 4) * 2));
-      //set checkIndex to a tile at a random point within bounds
-      checkIndex = new Pair(tk.randomNum((this.levelCount < 4 ? 15 : 1) + ((dimensions.x + 1) / 2), (this.levelCount < 4 ? 34 : 48) - ((dimensions.x + 1) / 2)), tk.randomNum((this.levelCount < 4 ? 15 : 1) + ((dimensions.y + 1) / 2), (this.levelCount < 4 ? 34 : 48) - ((dimensions.y + 1) / 2)));
-      //prepare for check
-      checkFailed = false;
-      //cycle through x tiles within dimensions + 1 so walls are on outside of room
-      for(let i = (dimensions.x + 3 ) / -2; i <= (dimensions.x + 3) / 2; i++) {
-        //cycle through y tiles similarly
-        for(let ii = (dimensions.y + 3) / -2; ii <= (dimensions.y + 3) / 2; ii++) {
-          //if a room is present (floor detected), fail the check and break first loop
-          if(this.map[checkIndex.x + i][checkIndex.y + ii].type === "floor") {
-            checkFailed = true;
+    //populate map with rooms
+    let maxRooms = tk.randomNum(8, 12);
+    let limiter = 0;
+    let roomCount = 0;
+    let dimensions;
+    while(limiter < 500 && roomCount < maxRooms) {
+      limiter++;
+      dimensions = new Pair(tk.randomNum(5, 11), tk.randomNum(5, 11))
+      this.rooms.push(new Room(this, new Pair(tk.randomNum(3, 44 - dimensions.x), tk.randomNum(3, 44 - dimensions.y)), dimensions));
+      if(this.rooms[this.rooms.length - 1].stamp()) {
+        roomCount++;
+      } else {
+        this.rooms.pop();
+      }
+    }
+    //assign player and sphere
+    this.playerSpawn = this.getIndex(this.rooms[0].centerIndex).transform.duplicate();
+    this.sphere = new Sphere(this.getIndex(this.rooms[this.rooms.length - 1].centerIndex).transform.duplicate(), this.getIndex(this.rooms[this.rooms.length - 1].centerIndex), this.levelCount);
+    //pathfinder for corridors
+    let cpc = new PathfindingController(this.map, false);
+    //nonwalkable indices for corridor generation
+    const corridorNWs = [];
+    for(let tc = 0; tc < 2500; tc++) {
+      if(Math.floor(tc / 50) === 0 || tc % 50 === 0 || Math.floor(tc / 50) === 49 || tc % 50 === 49) {
+        corridorNWs.push(this.map[Math.floor(tc / 50)][tc % 50].index);
+      }
+      this.rooms.forEach((room) => {
+        if(room.includesIndex(new Pair(Math.floor(tc / 50), tc % 50))) {
+          corridorNWs.push(this.map[Math.floor(tc / 50)][tc % 50].index);
+        }
+      });
+    }
+    //cycle building corridors through determined path
+    let path;
+    let evaledDoors = [];
+    for(let rc = 0; rc < this.rooms.length - 1; rc++) {
+      path = cpc.pathfind(this.rooms[rc].doors[1].index, this.rooms[rc + 1].doors[0].index, corridorNWs, 1000);
+      //fill out path
+      if(path !== null) {
+        evaledDoors.push(this.rooms[rc].doors[1]);
+        evaledDoors.push(this.rooms[rc + 1].doors[0]);
+        path.pop();
+        path.forEach((index) => {
+          this.map[index.x][index.y] = new Floor(this.getIndex(index).transform.duplicate(), index.duplicate());
+        });
+      }
+    }
+    //get all doors
+    let doors = [];
+    this.rooms.forEach((room) => {
+      for(let dc = 0; dc < room.doors.length; dc++) {
+        let validated = true;
+        for(let edc = 0; edc < evaledDoors.length; edc++) {
+          if(room.doors[dc] === evaledDoors[edc]) {
+            validated = false;
             break;
           }
         }
-        //break second loop if failed
-        if(checkFailed) {
-          break;
+        if(validated) {
+          doors.push(room.doors[dc]);
         }
       }
-      //if check successful
-      if(!checkFailed) {
-        //add center room index to rooms to carve hallways later
-        rooms.push(checkIndex);
-        //cycle through tiles again to insert floors
-        for(let i = (dimensions.x + 1) / -2; i <= (dimensions.x + 1) / 2; i++) {
-          for(let ii = (dimensions.y + 1) / -2; ii <= (dimensions.y + 1) / 2; ii++) {
-            this.map[checkIndex.x + i][checkIndex.y + ii] = new Floor(this.map[checkIndex.x + i][checkIndex.y + ii].transform, new Pair(checkIndex.x + i, checkIndex.y + ii));
+    });
+    //build remaining corridors
+    while(doors.length > 1) {
+      let bestPath = null;
+      let bestIndex = null;
+      let currentPath = null;
+      for(let dc = 1; dc < doors.length; dc++) {
+        currentPath = cpc.pathfind(doors[0].index, doors[dc].index, corridorNWs, 1000);
+        if(currentPath !== null) {
+          if(bestPath === null || currentPath.length < bestPath.length) {
+            bestPath = currentPath;
+            bestIndex = dc;
           }
         }
       }
-    }
-    //variables to hold most distant
-    let mostDistance = 0;
-    let mostDistant = new Pair(0, 1);
-    //find most distant pair of rooms
-    for(let i = 0; i < rooms.length; i++) {
-      for(let ii = 0; ii < rooms.length; ii++) {
-        let currentDist = tk.calcDistance(this.map[rooms[i].x][rooms[i].y].transform, this.map[rooms[ii].x][rooms[ii].y].transform)
-        if(currentDist > mostDistance) {
-          mostDistance = currentDist;
-          mostDistant.x = i;
-          mostDistant.y = ii;
-        }
-      }
-    }
-    this.playerSpawn = this.map[rooms[mostDistant.x].x][rooms[mostDistant.x].y].transform.duplicate();
-    this.sphere = new Sphere(this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y].transform.duplicate(), this.map[rooms[mostDistant.y].x][rooms[mostDistant.y].y], this.levelCount)
-    //currentIndex pair to track current map matrix index
-    let currentIndex = rooms[0].duplicate();
-    //currentTarget pair which tracks the current carve target for first step
-    let currentTarget = null;
-    //start carving between rooms
-    for(let i = 1; i < rooms.length; i++) {
-      //set the current target to the end of the first leg
-      if(this.map[currentIndex.x, rooms[i].y].type === "floor") {
-        currentTarget = new Pair(rooms[i].x, currentIndex.y);
+      if(bestPath !== null) {
+        bestPath.pop();
+        bestPath.forEach((index) => {
+          this.map[index.x][index.y] = new Floor(this.getIndex(index).transform.duplicate(), index.duplicate());
+        });
+        doors.shift()
+        doors.splice(bestIndex, 1);
       } else {
-        currentTarget = new Pair(currentIndex.x, rooms[i].y);
-      }
-      //move towards target
-      while(currentIndex.x !== currentTarget.x || currentIndex.y !== currentTarget.y) {
-        //move on x axis
-        if(currentIndex.x < currentTarget.x) {
-          currentIndex.x++;
-        } else if(currentIndex.x > currentTarget.x) {
-          currentIndex.x--;
-        }
-        //move on y axis
-        if(currentIndex.y < currentTarget.y) {
-          currentIndex.y++;
-        } else if(currentIndex.y > currentTarget.y) {
-          currentIndex.y--;
-        }
-        //insert floors
-        if(this.map[currentIndex.x][currentIndex.y].type === "wall") {
-          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform, currentIndex.duplicate());
-        }
-      }
-      //reset currentTarget to next room
-      currentTarget = rooms[i];
-      //move towards next room on second leg
-      while(currentIndex.x !== currentTarget.x || currentIndex.y !== currentTarget.y) {
-        //move on x axis
-        if(currentIndex.x < currentTarget.x) {
-          currentIndex.x++;
-        } else if(currentIndex.x > currentTarget.x) {
-          currentIndex.x--;
-        }
-        //move on y axis
-        if(currentIndex.y < currentTarget.y) {
-          currentIndex.y++;
-        } else if(currentIndex.y > currentTarget.y) {
-          currentIndex.y--;
-        }
-        //insert floors
-        if(this.map[currentIndex.x][currentIndex.y].type === "wall") {
-          this.map[currentIndex.x][currentIndex.y] = new Floor(this.map[currentIndex.x][currentIndex.y].transform, currentIndex.duplicate());
-        }
+        this.map[doors[0].index.x][doors[0].index.y] = new Wall(this.getIndex(doors[0].index).transform.duplicate(), doors[0].index.duplicate());
+        doors.shift();
       }
     }
-    //enemy spawning
-    while(this.enemies.length < levelCount) {
-      let spawnTile = this.map[tk.randomNum(1, 48)][tk.randomNum(1, 48)];
-      if(spawnTile.type === "floor" && tk.calcDistance(spawnTile.transform, this.playerSpawn) > tileSize * 5) {
-        this.enemies.push(new Cube(spawnTile.transform.duplicate(), spawnTile));
+    this.map[doors[0].index.x][doors[0].index.y] = new Wall(this.getIndex(doors[0].index).transform.duplicate(), doors[0].index.duplicate());
+    doors.shift()
+    if(cpc.pathfind(this.rooms[0].centerIndex, this.rooms[this.rooms.length - 1].centerIndex, this.getNonWalkables(this), 10000) === null) {
+      let path = cpc.pathfind(this.rooms[0].doors[0].index, this.rooms[this.rooms.length - 1].doors[0].index, [], 1000);
+      path.pop();
+      path.forEach((index) => {
+        this.map[index.x][index.y] = new Floor(this.getIndex(index).transform.duplicate(), index.duplicate());
+      });
+    }
+    //add enemies
+    let totalEnemies = 0;
+    let tileSelect = null;
+    let lc = 0;
+    while(totalEnemies < this.levelCount + 3 && lc < 100) {
+      lc++;
+      tileSelect = this.getIndex(new Pair(tk.randomNum(1, 48), tk.randomNum(1, 48)));
+      if(tileSelect?.type === "floor" && tk.calcDistance(tileSelect.transform, this.playerSpawn) > 10 * tileSize) {
+        totalEnemies++;
+        this.enemies.push(new Cube(tileSelect.transform.duplicate(), tileSelect));
       }
     }
   }
@@ -946,6 +1045,7 @@ class Level {
           currentEC.add(new CubeDeath(currentLevel.enemies[i]));
           player.addXP(currentLevel.enemies[i].xpValue);
         }
+        currentLevel.enemies[i].tile.entity = null;
         currentLevel.enemies.splice(i, 1);
         i--;
       }
@@ -960,7 +1060,7 @@ class Level {
     return null;
   }
   getIndex(index) {
-    if(index.x > 0 && index.x < 49 && index.y > 0 && index.y < 49) {
+    if(index.x >= 0 && index.x < 50 && index.y >= 0 && index.y < 50) {
       return this.map[index.x][index.y] || null;
     } else {
       return null;
@@ -968,11 +1068,19 @@ class Level {
   }
   getNonWalkables(client) {
     const retList = [];
-    if(client.type !== "player") {
+    //get friendlies that cant be walked on
+    if(client.type !== "player" && client.type !== "level") {
       retList.push(this.sphere.tile.index.duplicate());
       this.enemies.forEach((enemy) => {
         retList.push(enemy.tile.index.duplicate());
       });
+    }
+    //get walls
+    for(let ct = 0; ct < 2500; ct++) {
+      let tObj = this.map[Math.floor(ct / 50)][ct % 50];
+      if(tObj.type === "wall") {
+        retList.push(tObj.index);
+      }
     }
     return retList;
   }
@@ -992,18 +1100,19 @@ class Level {
       //mini raycast
       for(let d = 0; d < this.visionRange; d++) {
         let activeTile = rotationalTile(player.tile.index, angle, d);
-        if(activeTile !== null && activeTile?.type !== "wall") {
+        if(activeTile === null) {
+          break;
+        }
+        if(activeTile.type === "wall" || (activeTile.type === "door" && activeTile.entity === null)) {
+          activeTile.revealed = true;
+          activeTile.visible = true;
+          break;
+        } else {
           if(!closed.has(toKey(activeTile?.index))) {
             activeTile.revealed = true;
             activeTile.visible = true;
             closed.add(toKey(activeTile.index));
           }
-        } else if(activeTile?.type === "wall") {
-          activeTile.revealed = true;
-          activeTile.visible = true;
-          break;
-        } else {
-          break;
         }
       }
     }

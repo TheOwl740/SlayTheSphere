@@ -67,18 +67,18 @@ function loadNewLevel() {
     //instantiate and generate new level
     currentLevel = new Level(currentLevel?.levelCount + 1 || 1);
     //instantiate pathfinding controller on new level
-    currentPC = new PathfindingController(currentLevel.map);
+    currentPC = new PathfindingController(currentLevel.map, true);
     //create new or apply transform to existing player
     if(player === null) {
-      player = new Player(currentLevel.playerSpawn)
+      player = new Player(currentLevel.playerSpawn.duplicate())
     } else {
-      player.transform = currentLevel.playerSpawn;
+      player.transform = currentLevel.playerSpawn.duplicate();
       updateTERelationship(null, player, currentLevel.getTile(currentLevel.playerSpawn));
       player.movePath = null;
     }
     //initialize turn controller data
     currentTC.initialize();
-    window.setTimeout(resolve, 1000);
+    resolve();
   });
 }
 //renders healthbar of an object, provided it has a health and transform object attached
@@ -249,14 +249,15 @@ function updateTERelationship(oldTile, entity, newTile) {
 }
 //rotational translate for whole indices
 function rotationalTile(index, angle, magnitude) {
-  return currentLevel.getIndex((index.duplicate().add(tk.calcRotationalTranslate(angle, magnitude))).round(0))
+  return currentLevel.getIndex((index.duplicate().add(tk.calcRotationalTranslate(angle, magnitude))).round(0));
 }
-//tile based raycast, blocked by nonwalkables
+//tile based raycast, blocked by nonwalkables.. 
 function raycast(originIndex, targetIndex) {
-  let angle = tk.calcAngle(originIndex, targetIndex)
-  for(let seg = 0; seg < Math.round(currentPC.octile(originIndex, targetIndex)); seg++) {
-    if(rotationalTile(originIndex, angle, seg)?.type === "wall") {
-      return rotationalTile(originIndex, angle, seg);
+  let angle = tk.calcAngle(originIndex, targetIndex);
+  for(let seg = 0; seg < Math.round(currentPC.heuristic(originIndex, targetIndex)); seg++) {
+    let activeTile = rotationalTile(originIndex, angle, seg);
+    if(activeTile.type === "wall" || (activeTile.type === "door" && activeTile.entity === null)) {
+      return activeTile;
     }
   }
   return false;
