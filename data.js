@@ -735,7 +735,7 @@ class Tile {
     this.transform = transform;
     this.index = index;
     this.shape = new Rectangle(0, tileSize, tileSize);
-    this.revealed = true;
+    this.revealed = false;
     this.visible = false;
   }
 }
