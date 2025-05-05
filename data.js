@@ -735,7 +735,7 @@ class Tile {
     this.transform = transform;
     this.index = index;
     this.shape = new Rectangle(0, tileSize, tileSize);
-    this.revealed = false;
+    this.revealed = true;
     this.visible = false;
   }
 }
@@ -970,7 +970,7 @@ class Level {
       for(let dc = 0; dc < room.doors.length; dc++) {
         let validated = true;
         for(let edc = 0; edc < evaledDoors.length; edc++) {
-          if(room.doors[dc] === evaledDoors[edc]) {
+          if(room.doors[dc].index.isEqualTo(evaledDoors[edc].index)) {
             validated = false;
             break;
           }
@@ -999,15 +999,17 @@ class Level {
         bestPath.forEach((index) => {
           this.map[index.x][index.y] = new Floor(this.getIndex(index).transform.duplicate(), index.duplicate());
         });
-        doors.shift()
         doors.splice(bestIndex, 1);
+        doors.shift()
       } else {
         this.map[doors[0].index.x][doors[0].index.y] = new Wall(this.getIndex(doors[0].index).transform.duplicate(), doors[0].index.duplicate());
         doors.shift();
       }
     }
-    this.map[doors[0].index.x][doors[0].index.y] = new Wall(this.getIndex(doors[0].index).transform.duplicate(), doors[0].index.duplicate());
-    doors.shift()
+    if(doors.length > 0) {
+      this.map[doors[0].index.x][doors[0].index.y] = new Wall(this.getIndex(doors[0].index).transform.duplicate(), doors[0].index.duplicate());
+    }
+    doors.shift();
     if(cpc.pathfind(this.rooms[0].centerIndex, this.rooms[this.rooms.length - 1].centerIndex, this.getNonWalkables(this), 10000) === null) {
       let path = cpc.pathfind(this.rooms[0].doors[0].index, this.rooms[this.rooms.length - 1].doors[0].index, [], 1000);
       path.pop();
