@@ -213,24 +213,8 @@ function updateSkillTree() {
 function updateTutorial() {
   //canvas clear
   cs.fillAll(new Fill("#000000", 1));
-  //background circle
-  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 2) * (((Math.sin(ec / 50) + 1) / 8) + 1)), new Fill("#0a6f22", (Math.sin(ec / 50) + 2) / 4), null);
-  rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 3) * (((Math.sin(ec / 25) + 1) / 8) + 1)), new Fill("#0a6f22", (Math.sin(ec / 25) + 2) / 4), null);
-  //text rendering
-  rt.renderText(new Pair(cs.w / 2, cs.h / -15), new TextNode("Courier New", "How To Play", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 1)), new TextNode("Courier New", "Slay The Sphere is a turn based dungeon crawler", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 2)), new TextNode("Courier New", "The objective is to destroy each floor's sphere", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 3)), new TextNode("Courier New", "Move by clicking floor tiles, (light colored)", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 4)), new TextNode("Courier New", "You will encounter enemies (red cubes and more)", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 5)), new TextNode("Courier New", "Click them to attack. They will emit damage numbers", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 6)), new TextNode("Courier New", "Watch your healthbar (top left)- no respawns", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 7)), new TextNode("Courier New", "Killing enemies awards xp- 20 xp for a skill point", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 8)), new TextNode("Courier New", "Destroy the sphere to advance to next level", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 9)), new TextNode("Courier New", "The dungeon's dark- shaded tiles are out of view", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 10)), new TextNode("Courier New", "Even explored tiles can hide enemies if out of view", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 11)), new TextNode("Courier New", "Need to wait a turn? Perform a wait action (z button)", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 12)), new TextNode("Courier New", "Regen requires recently gained xp- can't run forever", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
-  rt.renderText(new Pair(cs.w * 0.05, (cs.h / -10) - ((landscape ? cs.w / 40 : cs.h / 30) * 13)), new TextNode("Courier New", "Wrap enemies around corners to surprise attack", 0, landscape ? cs.w / 50 : cs.h / 75, "left"), new Fill("#EEEEFF", 1));
+  let tile = new Textbox(hts, new Pair(cs.w / 2, cs.h / -2), new Pair(cs.w - 50, cs.h - 50), new TextNode("Courier New", "Slay The Sphere is a turn based dungeon crawler. The objective is to destroy each floor's sphere. Move by clicking floor tiles, (light colored). You will encounter enemies (red cubes and more). Click them to attack. They will emit damage numbers. Watch your healthbar (top left)- no respawns. Killing enemies awards xp- 20 xp for a skill point. Destroy the sphere to advance to next level. The dungeon's dark- shaded tiles are out of view. Even explored tiles can hide enemies if out of view. Need to wait a turn? Perform a wait action (z button). Regen requires recently gained xp- can't run forever. Wrap enemies around corners to surprise attack.", 0, landscape ? cs.w / 50 : cs.h / 75, "left"));
+  tile.render();
   //exit button render
   rt.renderRectangle(buttonData.exit.transform().add(rt.camera), buttonData.exit.shape, new Fill("#82846e", 0.5), null);
   rt.renderText(buttonData.exit.transform().add(rt.camera), new TextNode("Courier New", "x", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#d13c3c", 1));

@@ -4,6 +4,8 @@ const cs = new Canvas(document.getElementById("canvas"));
 const rt = new RenderTool(cs);
 const et = new EventTracker(cs);
 const tk = new Toolkit();
+const hrt = new RenderTool(cs);
+const hts = new TileScheme(hrt, new Fill("#5c0051", 1), new Fill("#c23eb2", 1), new Border("#780d6b", 1, 5, "bevel"), new Border("#3f0038", 1, 5, "bevel"), new Fill("#FFFFFF", 1))
 let gt;
 //canvas dimensions initialization
 cs.setDimensions(window.visualViewport?.width || window.innerWidth, window.visualViewport?.height || window.innerHeight);
@@ -735,7 +737,7 @@ class Tile {
     this.transform = transform;
     this.index = index;
     this.shape = new Rectangle(0, tileSize, tileSize);
-    this.revealed = true;
+    this.revealed = false;
     this.visible = false;
   }
 }
@@ -880,7 +882,7 @@ class Room {
         }
       });
       //check for corners
-      if(nonAdjacent && !(rch.index.isEqualTo(this.index) || rch.index.isEqualTo(this.index.duplicate().add(this.dimensions).subtract(new Pair(1, 1))) || rch.index.isEqualTo(this.index.duplicate().add(new Pair(this.dimensions.x - 1, 0)))  || rch.index.isEqualTo(this.index.duplicate().add(new Pair(0, this.dimensions.y - 1))))) {
+      if(nonAdjacent && !(rch.index.isEqualTo(this.index) || rch.index.isEqualTo(this.index.duplicate().add(this.dimensions).add(new Pair(-1, -1))) || rch.index.isEqualTo(this.index.duplicate().add(new Pair(this.dimensions.x - 1, 0)))  || rch.index.isEqualTo(this.index.duplicate().add(new Pair(0, this.dimensions.y - 1))))) {
         //assign door if available
         if(rch?.type === "wall") {
           this.level.map[rch.index.x][rch.index.y] = new Door(rch.transform, rch.index, vertical, this);
