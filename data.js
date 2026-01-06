@@ -1,4 +1,5 @@
 //ENVIRONMENT INITIALIZATION
+
 //engine tool constants
 const cs = new Canvas(document.getElementById("canvas"));
 const rt = new RenderTool(cs);
@@ -7,13 +8,29 @@ const tk = new Toolkit();
 const hrt = new RenderTool(cs);
 const hts = new TileScheme(hrt, new Fill("#5c0051", 1), new Fill("#c23eb2", 1), new Border("#780d6b", 1, 5, "bevel"), new Border("#3f0038", 1, 5, "bevel"), new Fill("#FFFFFF", 1))
 let gt;
-//canvas dimensions initialization
+//canvas initialization
 cs.setDimensions(window.visualViewport?.width || window.innerWidth, window.visualViewport?.height || window.innerHeight);
+cs.cx.imageSmoothingEnabled = false;
 //browser limiters
 et.tabEnabled = false;
 et.rightClickEnabled = false;
 
+//ASSET LOADING
+//font
+const pixelFont = new FontFace('pixelFont', 'url(Assets/pixelFont.ttf)');
+pixelFont.load().then((font) => {
+  document.fonts.add(font);
+});
+
+//images
+const images = {
+  marshallMole: {
+    body: new Sprite(tk.generateImage("Assets/MarshallMole/body.png"), 1, 0, 0, 0, 200, 200, false, false, 32, 32)
+  }
+}
+
 //GLOBAL VARIABLES
+
 //freecam mode bool
 let freecam = true;
 //epoch counter (ticks since game start)
@@ -168,7 +185,7 @@ class DamageNumber extends Effect {
   update() {
     this.remainingDuration--;
     if(this.sourceAttack.actor.tile.visible) {
-      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "-" + this.sourceAttack.damage, 0, (landscape ? cs.w / 50 : cs.h / 35), "center"), new Fill(this.sourceAttack.surprise ? "#ffff00" : "#561919", this.remainingDuration / 60));
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("pixelFont", "-" + this.sourceAttack.damage, 0, (landscape ? cs.w / 50 : cs.h / 35), "center"), new Fill(this.sourceAttack.surprise ? "#ffff00" : "#561919", this.remainingDuration / 60));
     }
   }
 }
@@ -180,7 +197,7 @@ class XPEffect extends Effect {
   }
   update() {
     this.remainingDuration--;
-    rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "+" + this.xpCount + "xp", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#c4b921", this.remainingDuration / 60));
+    rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("pixelFont", "+" + this.xpCount + "xp", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#c4b921", this.remainingDuration / 60));
   }
 }
 //skill point gain effect
@@ -191,7 +208,7 @@ class SPEffect extends Effect {
   }
   update() {
     this.remainingDuration--;
-    rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", `+${this.pointCount} Skill Point${this.pointCount > 1 ? "s" : ""}!`, 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#c4b921", this.remainingDuration / 120));
+    rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("pixelFont", `+${this.pointCount} Skill Point${this.pointCount > 1 ? "s" : ""}!`, 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#c4b921", this.remainingDuration / 120));
   }
 }
 //cube death subclass
@@ -214,11 +231,11 @@ class NewLevelEffect extends Effect {
   update() {
     this.remainingDuration--;
     if(this.remainingDuration > 150) {
-      rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, (cs.w / 10) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
-      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, (cs.w / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+      rt.renderText(this.transform, new TextNode("pixelFont", `-Level ${currentLevel.levelCount}-`, 0, (cs.w / 10) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("pixelFont", "-Slay the Sphere-", 0, (cs.w / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
     } else {
-      rt.renderText(this.transform, new TextNode("Courier New", `-Level ${currentLevel.levelCount}-`, 0, cs.w / 10, "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
-      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("Courier New", "-Slay the Sphere-", 0, (cs.w / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+      rt.renderText(this.transform, new TextNode("pixelFont", `-Level ${currentLevel.levelCount}-`, 0, cs.w / 10, "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("pixelFont", "-Slay the Sphere-", 0, (cs.w / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
     }
   }
 }
@@ -230,7 +247,7 @@ class WaitEffect extends Effect {
   update() {
     this.remainingDuration--;
     if(this.actor.tile.visible) {
-      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("Courier New", "z", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#8500d2", this.remainingDuration / 100));
+      rt.renderText(this.transform.add(new Pair(Math.sin(ec / 10) * 0.1, 0.1)), new TextNode("pixelFont", "z", 0, (landscape ? cs.w : cs.h) / 30, "center"), new Fill("#8500d2", this.remainingDuration / 100));
     }
   }
 }
