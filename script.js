@@ -12,9 +12,6 @@ function update() {
     case "homescreen":
       updateHomescreen()
       break;
-    case "loading":
-      updateLoadscreen();
-      break;
     case "inGame":
       updateCamera();
       updateGame();

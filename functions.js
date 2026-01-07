@@ -20,15 +20,22 @@ function updateGame() {
 function updateHomescreen() {
   //canvas clear
   cs.fillAll(new Fill("#783b0d", 1));
+  //update mole animation
+  if(player === null) {
+    player = new Player(new Pair(cs.w / 2, cs.h / -2))
+  }
   //rendering
   rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 2) * (((Math.sin(ec / 50) + 1) / 8) + 1)), new Fill("#301f04", (Math.sin(ec / 50) + 2) / 4), null);
   rt.renderCircle(new Pair(cs.w / 2, cs.h / -2), new Circle(((landscape ? cs.w : cs.h) / 3) * (((Math.sin(ec / 25) + 1) / 8) + 1)), new Fill("#301f04", (Math.sin(ec / 25) + 2) / 4), null);
-  rt.renderImage(new Pair(cs.w / 2, cs.h / -2), images.marshallMole.body);
+  player.render();
   rt.renderText(new Pair(cs.w / 2, cs.h / -3), new TextNode("pixelFont", "MoleHole", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#EEEEFF", 1));
   rt.renderText(new Pair(cs.w / 2, (cs.h / -1.5) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("pixelFont", `- ${landscape ? "click" : "tap"} anywhere to begin -`, 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
   //game start
   if(et.getClick("left") && bc.ready()) {
-    gameState = "loading";
+    [images.marshallMole.body.w, images.marshallMole.body.h] = [tileSize, tileSize];
+    images.marshallMole.body.y = tileSize / 3;
+    player = new Player(null);
+    loadLevel(0);
   }
 }
 //camera update for player and freecam
@@ -53,56 +60,34 @@ function updateCamera() {
   }
 }
 //loads next level
-function loadNewLevel() {
-  return new Promise((resolve) => {
-    //create new effect controller
-    currentEC = new EffectController();
-    //create new turn controller
-    currentTC = new TurnController();
-    //instantiate and generate new level
-    currentLevel = new Level(currentLevel?.levelCount + 1 || 1);
-    //instantiate pathfinding controller on new level
-    currentPC = new PathfindingController(currentLevel.map, true);
-    //create new or apply transform to existing player
-    if(player === null) {
-      player = new Player(currentLevel.playerSpawn.duplicate())
-    } else {
-      player.transform = currentLevel.playerSpawn.duplicate();
-      updateTERelationship(null, player, currentLevel.getTile(currentLevel.playerSpawn));
-      player.movePath = null;
-    }
-    //initialize turn controller data
-    currentTC.initialize();
-    resolve();
-  });
+function loadLevel(levelId) {
+  //create new effect controller
+  currentEC = new EffectController();
+  //create new turn controller
+  currentTC = new TurnController();
+  //instantiate and generate new level
+  currentLevel = new Level(levelId);
+  //instantiate pathfinding controller on new level
+  currentPC = new PathfindingController(currentLevel.map, true);
+  //apply start transform to player
+  player.transform = currentLevel.playerSpawn.duplicate();
+  updateTERelationship(null, player, currentLevel.getTile(currentLevel.playerSpawn));
+  player.movePath = null;
+  //initialize turn controller data
+  currentTC.initialize();
+  //lock camera to player
+  rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2));
+  //shade first area
+  currentLevel.reshade();
+  //add levelEffect
+  currentEC.add(new NewLevelEffect());
+  //start game
+  gameState = "inGame";
 }
 //renders healthbar of an object, provided it has a health and transform object attached
 function renderHealthbar(targetObj, yOffset) {
   rt.renderRectangle(targetObj.transform.duplicate().add(new Pair(0, yOffset)), new Rectangle(0, tileSize * 0.75, tileSize * 0.2), new Fill("#d60000", 0.5), null);
   rt.renderRectangle(targetObj.transform.duplicate().add(new Pair(0, yOffset)), new Rectangle(0, tileSize * 0.7 * (targetObj.health.current / targetObj.health.max), tileSize * 0.175), new Fill("#16d700", 0.5), null)
-}
-//updates the loadscreen before next level
-function updateLoadscreen() {
-  if(loadStarted) {
-    rt.camera = new Pair(0, 0);
-    cs.fillAll(new Fill("#000000", 1));
-    rt.renderText(new Pair(cs.w / 2, (cs.h / -2) + (landscape ? cs.w / 10 : cs.h / 10)), new TextNode("pixelFont", "Loading...", 0, landscape ? cs.w / 40 : cs.h / 20, "center"), new Fill("#FFFFFF", 1));
-    rt.renderRectangle(new Pair(cs.w / 2, cs.h / -2), new Rectangle(ec % 360, landscape ? cs.w / 10 : cs.h / 10, landscape ? cs.w / 10 : cs.h / 10), new Fill("#00bbff", 1), new Border("#0091c5", 1, 5, "round"));
-    rt.renderRectangle(new Pair(cs.w / 2, cs.h / -2), new Rectangle((ec % 360) * -1, landscape ? cs.w / 20 : cs.h / 20, landscape ? cs.w / 20 : cs.h / 20), new Fill("#00bbff", 1), new Border("#0091c5", 1, 5, "round"));
-  } else {
-    loadStarted = true;
-    loadNewLevel().then(() => {
-      //lock camera to player
-      rt.camera = new Pair(player.transform.x - (cs.w / 2), player.transform.y + (cs.h / 2));
-      //shade first area
-      currentLevel.reshade();
-      //add levelEffect
-      currentEC.add(new NewLevelEffect());
-      //start game
-      gameState = "inGame";
-      loadStarted = false;
-    });
-  }
 }
 //renders hud overlay
 function updateHUD() {

@@ -1,5 +1,4 @@
 //ENVIRONMENT INITIALIZATION
-
 //engine tool constants
 const cs = new Canvas(document.getElementById("canvas"));
 const rt = new RenderTool(cs);
@@ -15,22 +14,7 @@ cs.cx.imageSmoothingEnabled = false;
 et.tabEnabled = false;
 et.rightClickEnabled = false;
 
-//ASSET LOADING
-//font
-const pixelFont = new FontFace('pixelFont', 'url(Assets/pixelFont.ttf)');
-pixelFont.load().then((font) => {
-  document.fonts.add(font);
-});
-
-//images
-const images = {
-  marshallMole: {
-    body: new Sprite(tk.generateImage("Assets/MarshallMole/body.png"), 1, 0, 0, 0, 200, 200, false, false, 32, 32)
-  }
-}
-
 //GLOBAL VARIABLES
-
 //freecam mode bool
 let freecam = true;
 //epoch counter (ticks since game start)
@@ -50,12 +34,29 @@ let currentEC = null;
 //landscape bool for multiplatform rendering
 const landscape = cs.w > cs.h;
 //tilesize for rendering tiles
-const tileSize = Math.floor(landscape ? cs.w / 25 : cs.h / 15);
+const tileSize = Math.floor(landscape ? cs.w / 15 : cs.h / 10);
+//tile size rectangle for overlays
+const tileShape = new Rectangle(0, tileSize, tileSize);
 //loadstarted tracker assists with loading
 let loadStarted = false;
 
-//OBJECTS
+//ASSET LOADING
+//font
+const pixelFont = new FontFace('pixelFont', 'url(Assets/pixelFont.ttf)');
+pixelFont.load().then((font) => {
+  document.fonts.add(font);
+});
+//images
+const images = {
+  marshallMole: {
+    body: new Sprite(tk.generateImage("Assets/MarshallMole/body.png"), 1, 0, 0, 0, 200, 200, false, false, 32, 32)
+  },
+  tilesets: {
+    basic: new Sprite(tk.generateImage("Assets/Tilesets/basic.png"), 1, 0, 0, 0, tileSize, tileSize, false, false, 32, 32)
+  }
+}
 
+//OBJECTS
 //mobile drag controller
 const tapData = {
   holdTime: 0,
@@ -231,11 +232,15 @@ class NewLevelEffect extends Effect {
   update() {
     this.remainingDuration--;
     if(this.remainingDuration > 150) {
-      rt.renderText(this.transform, new TextNode("pixelFont", `-Level ${currentLevel.levelCount}-`, 0, (cs.w / 10) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
-      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("pixelFont", "-Slay the Sphere-", 0, (cs.w / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+      if(currentLevel.levelId !== 0) {
+        rt.renderText(this.transform, new TextNode("pixelFont", `-Floor ${currentLevel.levelId}-`, 0, (cs.w / 10) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
+      }
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("pixelFont", currentLevel.zone, 0, (cs.w / 15) * (this.remainingDuration / 150), "center"), new Fill("#FFFFFF", 1));
     } else {
-      rt.renderText(this.transform, new TextNode("pixelFont", `-Level ${currentLevel.levelCount}-`, 0, cs.w / 10, "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
-      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("pixelFont", "-Slay the Sphere-", 0, (cs.w / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+      if(currentLevel.levelId !== 0) {
+        rt.renderText(this.transform, new TextNode("pixelFont", `-Level ${currentLevel.levelId}-`, 0, cs.w / 10, "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
+      }
+      rt.renderText(this.transform.duplicate().subtract(new Pair(0, landscape ? cs.w / 10 : cs.h / 10)), new TextNode("pixelFont", currentLevel.zone, 0, (cs.w / 15), "center"), new Fill("#FFFFFF", this.remainingDuration / 150));
     }
   }
 }
@@ -357,7 +362,11 @@ class Movement extends Action {
       //update tile relationship
       updateTERelationship(this.actor.tile, this.actor, this.targetTile);
       //face right direction
-      this.actor.shape.r = this.moveDirection;
+      if(this.actor.transform.x !== this.targetTile.transform.x) {
+        this.actor.leftFacing = this.actor.transform.x > this.targetTile.transform.x;
+      }
+      //start move animation
+      this.actor.animation.state = "move";
     }
     //while running
     if(this.remainingDuration > 1) {
@@ -368,13 +377,14 @@ class Movement extends Action {
         currentLevel.reshade();
       }
       this.actor.transform = this.targetTile.transform.duplicate();
+      //set back to idle
+      this.actor.animation.state = "idle";
     }
   }
   complete() {
     //update tile relationship
     updateTERelationship(this.actor.tile, this.actor, this.targetTile);
     this.actor.transform = this.targetTile.transform.duplicate();
-    this.actor.shape.r = this.moveDirection;
   }
 }
 class Melee extends Action {
@@ -426,22 +436,25 @@ class Player {
   constructor(transform) {
     this.type = "player";
     this.transform = transform;
-    this.shape = new Shape([
-      tk.calcRotationalTranslate(0, tileSize / 3),
-      tk.calcRotationalTranslate(120, tileSize / 3),
-      tk.calcRotationalTranslate(240, tileSize / 3)
-    ], 0);
-    this.fill = new Fill("#6262e7", 1);
     this.tile;
     this.movePath = null;
     this.targetIndex = null;
     this.nextTurn = 0;
     this.moveTime = 1;
-    this.levelCount = 1;
+    this.levelId = 1;
     this.xp = 0;
     this.skillPoints = 0;
     this.lastPosition;
     this.forceMove = false;
+    this.leftFacing = false;
+    this.sprites = {
+      body: images.marshallMole.body.duplicate()
+    }
+    this.animation = {
+      state: "idle",
+      deltaTime: 0,
+      frame: 0
+    }
     this.melee = {
       time: 1,
       damage: 7,
@@ -456,14 +469,60 @@ class Player {
       regenMax: 10,
       regenPoints: 0
     }
-    updateTERelationship(null, this, currentLevel.getTile(transform))
-  }
-  collider() {
-    return new Collider(player.transform, player.shape);
+    if(currentLevel !== null) {
+      updateTERelationship(null, this, currentLevel.getTile(transform))
+    }
   }
   render() {
-    let sinMultiplier = (Math.sin(ec / 50) / 4) + 1;
-    rt.renderShape(this.transform, this.shape, this.fill, new Border("#4b4be7", 1, 3 * sinMultiplier, "round"));
+    //animation frame update
+    this.animation.deltaTime += gt.deltaTime;
+    if(this.animation.state === "idle") {
+      if(this.animation.deltaTime > 0.2) {
+        this.animation.deltaTime = 0;
+        switch(this.animation.frame) {
+          case 0:
+            this.animation.frame++;
+            this.sprites.body.setActive(new Pair(0, 0))
+            break;
+          case 1:
+            this.animation.frame++;
+            this.sprites.body.setActive(new Pair(1, 0))
+            break;
+          case 2:
+            this.animation.frame++;
+            this.sprites.body.setActive(new Pair(0, 1))
+            break;
+          case 3:
+            this.animation.frame = 0;
+            this.sprites.body.setActive(new Pair(1, 0))
+            break;
+          default:
+            this.animation.frame = 0;
+            this.sprites.body.setActive(new Pair(2, 1))
+        }
+      }
+    } else if(this.animation.state === "move") {
+      if(this.animation.deltaTime > 0.1) {
+        this.animation.deltaTime = 0;
+        switch(this.animation.frame) {
+          case 0:
+            this.animation.frame++;
+            this.sprites.body.setActive(new Pair(0, 2))
+            break;
+          case 1:
+            this.animation.frame = 0;
+            this.sprites.body.setActive(new Pair(1, 2))
+            break;
+          default:
+            this.animation.frame = 0;
+            this.sprites.body.setActive(new Pair(1, 2))
+        }
+      }
+    }
+    //update direction
+    this.sprites.body.hf = this.leftFacing;
+    //image render
+    rt.renderImage(this.transform, this.sprites.body);
   }
   runTurn() {
     //set last position
@@ -505,11 +564,6 @@ class Player {
         this.targetIndex = null;
         this.forceMove = false;
         return null;
-      }
-      //check against sphere
-      if(currentLevel.sphere.tile.index.isEqualTo(this.movePath[0])) {
-        this.targetIndex = null;
-        return new Melee(this, currentLevel.sphere);
       }
       //check against cubes
       for(let i = 0; i < currentLevel.enemies.length; i++) {
@@ -573,36 +627,6 @@ class Enemy {
   }
   collider() {
     return new Collider(this.transform, this.shape);
-  }
-}
-class Sphere extends Enemy {
-  constructor(transform, tile, levelCount) {
-    super(transform, new Circle(tileSize * 2), tile);
-    this.type = "sphere"
-    this.fill = new Fill("#e0a204", 1);
-    this.playerLock = true;
-    this.xpValue = tk.randomNum(10, 20);
-    this.health = {
-      current: 10 * levelCount,
-      max: 10 * levelCount
-    }
-  }
-  render() {
-    if(this.tile.visible) {
-      let sinMultiplier = new Pair((Math.sin(ec / 50) / 4) + 1, (Math.sin(ec / 30) / 4) + 1);
-      rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.x ** 0.3)), new Fill(this.fill.color, 0.5 * sinMultiplier.x), null);
-      rt.renderCircle(this.transform, new Circle(this.shape.d * (sinMultiplier.y ** 0.3) * 0.75), new Fill(this.fill.color, 0.5 * sinMultiplier.y), null);
-      if(this.health.current < this.health.max) {
-        renderHealthbar(this, tileSize);
-      }
-    }
-  }
-  damage(attackAction) {
-    this.health.current -= attackAction.damage;
-    if(this.health.current < 1) {
-      gameState = "loading";
-      player.addXP(this.xpValue);
-    }
   }
 }
 class Cube extends Enemy {
@@ -750,303 +774,100 @@ class Cube extends Enemy {
   }
 }
 class Tile {
-  constructor(transform, index) {
+  constructor(transform, index, sprite) {
     this.transform = transform;
     this.index = index;
-    this.shape = new Rectangle(0, tileSize, tileSize);
+    this.sprite = sprite.duplicate();
+    this.sprite.r = tk.randomNum(0, 3) * 90;
     this.revealed = false;
     this.visible = false;
+  }
+  collider() {
+    return new Collider(this.transform, tileShape);
   }
 }
 //wall tile class
 class Wall extends Tile {
-  constructor(transform, index) {
-    super(transform, index);
+  constructor(transform, index, sprite) {
+    super(transform, index, sprite);
     this.type = "wall"
     this.walkable = false;
-    this.fill = new Fill("#222222", 1);
-    this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
-  }
-  collider() {
-    return new Collider(this.transform, this.shape);
+    this.sprite.setActive(new Pair(tk.randomNum(0, 1), 2));
   }
   render() {
     if(this.revealed) {
-      rt.renderRectangle(this.transform, this.shape, this.fill, this.border);
+      rt.renderImage(this.transform, this.sprite);
       if(!this.visible) {
-        rt.renderRectangle(this.transform, this.shape, new Fill("#000000", 0.3), null);
+        rt.renderRectangle(this.transform, tileShape, new Fill("#000000", 0.3), null);
       }
     }
   }
 }
 //floor tile subclass
 class Floor extends Tile {
-  constructor(transform, index) {
-    super(transform, index);
+  constructor(transform, index, sprite) {
+    super(transform, index, sprite);
     this.type = "floor"
     this.walkable = true;
     this.entity = null;
-    this.fill = new Fill("#535353", 1);
-    this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
-  }
-  collider() {
-    return new Collider(this.transform, this.shape);
+    this.sprite.setActive(new Pair(tk.randomNum(0, 1), tk.randomNum(0, 1)));
   }
   render() {
     if(this.revealed) {
-      rt.renderRectangle(this.transform, this.shape, this.fill, this.border);
+      rt.renderImage(this.transform, this.sprite);
       if(!this.visible) {
-        rt.renderRectangle(this.transform, this.shape, new Fill("#000000", 0.3), null);
+        rt.renderRectangle(this.transform, tileShape, new Fill("#000000", 0.3), null);
       }
     }
-  }
-}
-class Door extends Tile {
-  constructor(transform, index, vertical, parentRoom) {
-    super(transform, index);
-    this.type = "door"
-    this.walkable = true;
-    this.entity = null;
-    this.parentRoom = parentRoom;
-    this.vertical = vertical;
-    this.fill = new Fill("#7c6315", 1);
-    this.fFill = new Fill("#535353", 1);
-    this.border = new Border("#000000", 1, landscape ? 1 : 5, "butt");
-  }
-  collider() {
-    return new Collider(this.transform, this.shape);
-  }
-  render() {
-    if(this.revealed) {
-      rt.renderRectangle(this.transform, this.shape, this.fFill, this.border);
-      if(this.entity === null) {
-        rt.renderRectangle(this.transform, this.dShape(), this.fill, this.border);
-      } else {
-        rt.renderRectangle(this.vertical ? this.transform.duplicate().add(new Pair(0, tileSize / 3)) : this.transform.duplicate().add(new Pair(tileSize / 3, 0)), this.dShape(), this.fill, this.border);
-      }
-      if(!this.visible) {
-        rt.renderRectangle(this.transform, this.shape, new Fill("#000000", 0.3), null);
-      }
-    }
-  }
-  dShape() {
-    if(this.vertical) {
-      return new Rectangle(this.entity === null ? 0 : 90, tileSize / 3, tileSize);
-    } else {
-      return new Rectangle(this.entity === null ? 0 : 90, tileSize, tileSize / 3);
-    }
-  }
-}
-//room class containing subsets of tiles
-class Room {
-  constructor(level, index, dimensions) {
-    this.type = "room";
-    this.level = level;
-    this.dimensions = dimensions;
-    this.index = index;
-    this.doors = [];
-    this.centerIndex = level.getIndex(new Pair(Math.floor(this.dimensions.x / 2), Math.floor(this.dimensions.y / 2)).add(index))?.index;
-  }
-  stamp() {
-    //invalid checker
-    if(this.centerIndex === null) {
-      return false;
-    }
-    for(let x = 0; x < this.dimensions.x; x++) {
-      for(let y = 0; y < this.dimensions.y; y++) {
-        let activeTile = this.level.getIndex(new Pair(x, y).add(this.index));
-        if(activeTile === null || activeTile.type === "floor") {
-          return false;
-        }
-      }
-    }
-    //stamp floors
-    for(let x = 1; x < this.dimensions.x - 1; x++) {
-      for(let y = 1; y < this.dimensions.y - 1; y++) {
-        let activeTile = this.level.getIndex(new Pair(x, y).add(this.index));
-        this.level.map[x + this.index.x][y + this.index.y] = new Floor(activeTile.transform, activeTile.index);
-      }
-    }
-    //cast doors
-    let maxDoors = tk.randomNum(2, Math.floor(tk.calcDistance(this.dimensions, new Pair(0, 0))) / 4);
-    maxDoors = maxDoors < 2 ? 2 : maxDoors;
-    let dc = 0;
-    //loop until sufficient doors or over loop limit
-    while(dc < maxDoors) {
-      //setup variables
-      let rch = null;
-      let angle = tk.randomNum(0, 30) * 12;
-      //raycast
-      for(let seg = 0; seg < 50; seg++) {
-        let activeTile = this.level.getIndex((this.centerIndex.duplicate().add(tk.calcRotationalTranslate(angle, seg))).round(0));
-        if(activeTile !== null && (activeTile.type === "wall" || (activeTile.type === "door" && activeTile.entity !== null))) {
-          //break on wall or door hit
-          rch = activeTile;
-          break;
-        }
-      }
-      //backup continue
-      if(rch === null) {
-        continue;
-      }
-      //assign verticality
-      let vertical = rch.index.x === this.index.x || rch.index.x === this.index.x + (this.dimensions.x - 1);
-      let nonAdjacent = true;
-      //check for adjacent doors
-      this.doors.forEach((door) => {
-        if(tk.calcDistance(rch.index, door.index) < 2) {
-          nonAdjacent = false;
-        }
-      });
-      //check for corners
-      if(nonAdjacent && !(rch.index.isEqualTo(this.index) || rch.index.isEqualTo(this.index.duplicate().add(this.dimensions).add(new Pair(-1, -1))) || rch.index.isEqualTo(this.index.duplicate().add(new Pair(this.dimensions.x - 1, 0)))  || rch.index.isEqualTo(this.index.duplicate().add(new Pair(0, this.dimensions.y - 1))))) {
-        //assign door if available
-        if(rch?.type === "wall") {
-          this.level.map[rch.index.x][rch.index.y] = new Door(rch.transform, rch.index, vertical, this);
-          dc++;
-          this.doors.push(this.level.getIndex(rch.index));
-        }
-      }
-    }
-    //validate
-    return true;
-  }
-  includesIndex(index) {
-    return (index.x >= this.index.x && index.x < this.index.x + this.dimensions.x && index.y >= this.index.y && index.y < this.index.y + this.dimensions.y) && this.level.getIndex(index).type !== "door";
   }
 }
 //map and level dependents class
 class Level {
-  constructor(levelCount) {
+  constructor(levelId) {
     //data initialization
     this.type = "level";
     this.map = [];
     this.enemies = [];
-    this.rooms = [];
+    this.npcs = [];
+    this.items = [];
     this.playerSpawn = null;
-    this.sphere = null;
-    this.visionRange = tk.randomNum(3, 6)
-    this.levelCount = levelCount;
+    this.visionRange = 5;
+    this.levelId = levelId;
+    this.zone = "";
+
+    //assign zone
+    if(this.levelId === 0) {
+      this.zone = "The Mole Hill"
+    } else if(this.levelId >= 4) {
+      this.zone = "Buggy Burrows"
+    } else if(this.levelId >= 8) {
+      this.zone = "The Gnome Home"
+    } else if(this.levelId >= 12) {
+      this.zone = "Snakey Stronghold"
+    } else if(this.levelId >= 16) {
+      this.zone = "The Mustelid Mafia"
+    }
 
     //map generation
     //populate map with walls
     for(let i = 0; i < 50; i++) {
       this.map.push([]);
       for(let ii = 0; ii < 50; ii++) {
-        this.map[i][ii] = new Wall(new Pair((i - 25) * (tileSize - 1), (ii - 25) * (tileSize - 1)), new Pair(i, ii));
+        this.map[i][ii] = new Wall(new Pair((i - 25) * (tileSize - 1), (ii - 25) * (tileSize - 1)), new Pair(i, ii), images.tilesets.basic);
       }
     }
-    //populate map with rooms
-    let maxRooms = tk.randomNum(8, 12);
-    let limiter = 0;
-    let roomCount = 0;
-    let dimensions;
-    while(limiter < 500 && roomCount < maxRooms) {
-      limiter++;
-      dimensions = new Pair(tk.randomNum(5, 11), tk.randomNum(5, 11))
-      this.rooms.push(new Room(this, new Pair(tk.randomNum(3, 44 - dimensions.x), tk.randomNum(3, 44 - dimensions.y)), dimensions));
-      if(this.rooms[this.rooms.length - 1].stamp()) {
-        roomCount++;
-      } else {
-        this.rooms.pop();
-      }
-    }
-    //assign player and sphere
-    this.playerSpawn = this.getIndex(this.rooms[0].centerIndex).transform.duplicate();
-    this.sphere = new Sphere(this.getIndex(this.rooms[this.rooms.length - 1].centerIndex).transform.duplicate(), this.getIndex(this.rooms[this.rooms.length - 1].centerIndex), this.levelCount);
-    //pathfinder for corridors
-    let cpc = new PathfindingController(this.map, false);
-    //nonwalkable indices for corridor generation
-    const corridorNWs = [];
-    for(let tc = 0; tc < 2500; tc++) {
-      if(Math.floor(tc / 50) === 0 || tc % 50 === 0 || Math.floor(tc / 50) === 49 || tc % 50 === 49) {
-        corridorNWs.push(this.map[Math.floor(tc / 50)][tc % 50].index);
-      }
-      this.rooms.forEach((room) => {
-        if(room.includesIndex(new Pair(Math.floor(tc / 50), tc % 50))) {
-          corridorNWs.push(this.map[Math.floor(tc / 50)][tc % 50].index);
-        }
-      });
-    }
-    //cycle building corridors through determined path
-    let path;
-    let evaledDoors = [];
-    for(let rc = 0; rc < this.rooms.length - 1; rc++) {
-      path = cpc.pathfind(this.rooms[rc].doors[1].index, this.rooms[rc + 1].doors[0].index, corridorNWs, 1000);
-      //fill out path
-      if(path !== null) {
-        evaledDoors.push(this.rooms[rc].doors[1]);
-        evaledDoors.push(this.rooms[rc + 1].doors[0]);
-        path.pop();
-        path.forEach((index) => {
-          this.map[index.x][index.y] = new Floor(this.getIndex(index).transform.duplicate(), index.duplicate());
-        });
-      }
-    }
-    //get all doors
-    let doors = [];
-    this.rooms.forEach((room) => {
-      for(let dc = 0; dc < room.doors.length; dc++) {
-        let validated = true;
-        for(let edc = 0; edc < evaledDoors.length; edc++) {
-          if(room.doors[dc].index.isEqualTo(evaledDoors[edc].index)) {
-            validated = false;
-            break;
-          }
-        }
-        if(validated) {
-          doors.push(room.doors[dc]);
+    //molehill pre fall
+    if(levelId === 0) {
+      //fill first room
+      for(let i = 10; i < 20; i++) {
+        for(let ii = 7; ii < 20; ii++) {
+          this.map[i][ii] = new Floor(new Pair((i - 25) * (tileSize - 1), (ii - 25) * (tileSize - 1)), new Pair(i, ii), images.tilesets.basic);
         }
       }
-    });
-    //build remaining corridors
-    while(doors.length > 1) {
-      let bestPath = null;
-      let bestIndex = null;
-      let currentPath = null;
-      for(let dc = 1; dc < doors.length; dc++) {
-        currentPath = cpc.pathfind(doors[0].index, doors[dc].index, corridorNWs, 1000);
-        if(currentPath !== null) {
-          if(bestPath === null || currentPath.length < bestPath.length) {
-            bestPath = currentPath;
-            bestIndex = dc;
-          }
-        }
-      }
-      if(bestPath !== null) {
-        bestPath.pop();
-        bestPath.forEach((index) => {
-          this.map[index.x][index.y] = new Floor(this.getIndex(index).transform.duplicate(), index.duplicate());
-        });
-        doors.splice(bestIndex, 1);
-        doors.shift()
-      } else {
-        this.map[doors[0].index.x][doors[0].index.y] = new Wall(this.getIndex(doors[0].index).transform.duplicate(), doors[0].index.duplicate());
-        doors.shift();
-      }
-    }
-    if(doors.length > 0) {
-      this.map[doors[0].index.x][doors[0].index.y] = new Wall(this.getIndex(doors[0].index).transform.duplicate(), doors[0].index.duplicate());
-    }
-    doors.shift();
-    if(cpc.pathfind(this.rooms[0].centerIndex, this.rooms[this.rooms.length - 1].centerIndex, this.getNonWalkables(this), 10000) === null) {
-      let path = cpc.pathfind(this.rooms[0].doors[0].index, this.rooms[this.rooms.length - 1].doors[0].index, [], 1000);
-      path.pop();
-      path.forEach((index) => {
-        this.map[index.x][index.y] = new Floor(this.getIndex(index).transform.duplicate(), index.duplicate());
-      });
-    }
-    //add enemies
-    let totalEnemies = 0;
-    let tileSelect = null;
-    let lc = 0;
-    while(totalEnemies < this.levelCount + 3 && lc < 100) {
-      lc++;
-      tileSelect = this.getIndex(new Pair(tk.randomNum(1, 48), tk.randomNum(1, 48)));
-      if(tileSelect?.type === "floor" && tk.calcDistance(tileSelect.transform, this.playerSpawn) > 10 * tileSize) {
-        totalEnemies++;
-        this.enemies.push(new Cube(tileSelect.transform.duplicate(), tileSelect));
-      }
+      this.playerSpawn = this.getIndex(new Pair(13, 9)).transform.duplicate();
+    //buggy burrows
+    } else {
+      
     }
   }
   render() {
@@ -1056,18 +877,17 @@ class Level {
     for(let i = 0; i < this.enemies.length; i++) {
       this.enemies[i].render();
     }
-    this.sphere.render();
   }
   update() {
-    for(let i = 0; i < currentLevel.enemies.length; i++) {
-      if(currentLevel.enemies[i].health.current < 1) {
-        currentTC.remove(currentLevel.enemies[i]);
-        if(currentLevel.enemies[i].type === "cube") {
-          currentEC.add(new CubeDeath(currentLevel.enemies[i]));
-          player.addXP(currentLevel.enemies[i].xpValue);
+    for(let i = 0; i < this.enemies.length; i++) {
+      if(this.enemies[i].health.current < 1) {
+        currentTC.remove(this.enemies[i]);
+        if(this.enemies[i].type === "cube") {
+          currentEC.add(new CubeDeath(this.enemies[i]));
+          player.addXP(this.enemies[i].xpValue);
         }
-        currentLevel.enemies[i].tile.entity = null;
-        currentLevel.enemies.splice(i, 1);
+        this.enemies[i].tile.entity = null;
+        this.enemies.splice(i, 1);
         i--;
       }
     }
@@ -1091,7 +911,6 @@ class Level {
     const retList = [];
     //get friendlies that cant be walked on
     if(client.type !== "player" && client.type !== "level") {
-      retList.push(this.sphere.tile.index.duplicate());
       this.enemies.forEach((enemy) => {
         retList.push(enemy.tile.index.duplicate());
       });
@@ -1124,7 +943,7 @@ class Level {
         if(activeTile === null) {
           break;
         }
-        if(activeTile.type === "wall" || (activeTile.type === "door" && activeTile.entity === null)) {
+        if(activeTile.type === "wall") {
           activeTile.revealed = true;
           activeTile.visible = true;
           break;
