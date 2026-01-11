@@ -32,8 +32,8 @@ function updateHomescreen() {
   rt.renderText(new Pair(cs.w / 2, (cs.h / -1.5) - (landscape ? cs.w / 40 : cs.h / 30)), new TextNode("pixelFont", `- ${landscape ? "click" : "tap"} anywhere to begin -`, 0, landscape ? cs.w / 80 : cs.h / 40, "center"), new Fill("#EEEEFF", 1));
   //game start
   if(et.getClick("left") && bc.ready()) {
-    [images.moles.marshallMole.body.w, images.moles.marshallMole.body.h] = [tileSize, tileSize];
-    images.moles.marshallMole.body.y = tileSize / 3;
+    [images.moles.marshall.body.w, images.moles.marshall.body.h] = [tileSize, tileSize];
+    images.moles.marshall.body.y = tileSize / 3;
     player = new Player(null);
     loadLevel(0);
   }
@@ -217,7 +217,7 @@ function drill(startTile, steps) {
   let activeIndex = startTile.index.duplicate();
   let activeLevel = startTile.parentLevel;
   for(let step = 0; step < steps; step++) {
-    activeLevel.map[activeIndex.x][activeIndex.y] = new Floor(activeLevel.getIndex(activeIndex).transform.duplicate(), activeIndex.duplicate(), images.tilesets.basic, activeLevel);
+    activeLevel.map[activeIndex.x][activeIndex.y] = new Floor(activeLevel.getIndex(activeIndex).transform.duplicate(), activeIndex.duplicate(), images.tilesets.dirt, activeLevel);
     activeIndex.add(new Pair(tk.randomNum(-1, 1), tk.randomNum(-1, 1)));
     if(activeIndex.x > 49 || activeIndex.y > 49 || activeIndex.x < 0 || activeIndex.y < 0) {
       activeIndex = startTile.index.duplicate();

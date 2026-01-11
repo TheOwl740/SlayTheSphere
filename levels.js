@@ -12,6 +12,11 @@ class Tile {
   collider() {
     return new Collider(this.transform, tileShape);
   }
+  attachOverlay() {
+    if(this.overlay) {
+      this.overlay.attach(this);
+    }
+  }
 }
 //wall tile class
 class Wall extends Tile {
@@ -19,37 +24,80 @@ class Wall extends Tile {
     super(transform, index, sprite, parentLevel);
     this.type = "wall"
     this.walkable = false;
-    this.sprite.setActive(new Pair(tk.randomNum(2, 3), 3));
+    this.sprite.setActive(new Pair(tk.randomNum(0, 1), 3));
     this.overlay = overlay;
   }
   render() {
     if(this.revealed) {
       rt.renderImage(this.transform, this.sprite);
+      if(this.overlay) {
+        this.overlay.render();
+      }
       if(!this.visible) {
         rt.renderRectangle(this.transform, tileShape, new Fill("#000000", 0.7), null);
       }
-    }
-    if(this.overlay) {
-      this.overlay.render();
     }
   }
   //choose appropriate sprite to match adjacent floor positions
   assignDirectionality() {
     //find adjacent floors
-    let adjWalls = [];
+    let adjFloors = [];
     for(let j = 0; j < 9; j++) {
       if(j === 4) {
         continue;
       } else {
         let adjTile = this.parentLevel.getIndex(new Pair(this.index.x + ((j % 3) - 1), this.index.y + (Math.floor(j / 3) - 1)))
         if(adjTile !== null && adjTile.type !== "wall") {
-          adjWalls.push(j);
+          adjFloors.push(j);
         }
       }
     }
     //choose sprites
-    if(adjWalls.length > 0) {
-      this.sprite.setActive(new Pair(tk.randomNum(0, 1), adjWalls.includes(1) ? 2 : 3))
+    if(adjFloors.length > 0) {
+      this.sprite.setActive(new Pair(tk.randomNum(0, 1), adjFloors.includes(1) ? 2 : 3))
+    }
+  }
+}
+//pit tile class
+class Pit extends Tile {
+  constructor(transform, index, sprite, parentLevel, overlay) {
+    super(transform, index, sprite, parentLevel);
+    this.type = "pit"
+    this.walkable = false;
+    this.sprite.setActive(new Pair(tk.randomNum(0, 1), 4));
+    this.overlay = overlay;
+    this.usingSprite = false;
+  }
+  render() {
+    if(this.revealed) {
+      if(this.usingSprite) {
+        rt.renderImage(this.transform, this.sprite);
+      }
+      if(this.overlay) {
+        this.overlay.render();
+      }
+      if(!this.visible) {
+        rt.renderRectangle(this.transform, tileShape, new Fill("#000000", 0.7), null);
+      }
+    }
+  }
+  //choose appropriate sprite to match adjacent floor positions
+  assignDirectionality() {
+    //find adjacent floors
+    let adjFloors = [];
+    for(let j = 0; j < 9; j++) {
+      if(j === 4) {
+        continue;
+      } else {
+        let adjTile = this.parentLevel.getIndex(new Pair(this.index.x + ((j % 3) - 1), this.index.y + (Math.floor(j / 3) - 1)))
+        if(adjTile !== null && adjTile.type !== "pit") {
+          adjFloors.push(j);
+        }
+      }
+    }
+    //choose sprites
+    if(adjFloors.length > 0) {
+      this.usingSprite = adjFloors.includes(7);
     }
   }
 }
@@ -67,25 +115,38 @@ class Floor extends Tile {
   render() {
     if(this.revealed) {
       rt.renderImage(this.transform, this.sprite);
+      if(this.overlay) {
+        this.overlay.render();
+      }
       if(!this.visible) {
         rt.renderRectangle(this.transform, tileShape, new Fill("#000000", 0.7), null);
       }
-    }
-    if(this.overlay) {
-      this.overlay.render();
     }
   }
 }
 //tile overlay
 class TileOverlay {
-  constructor(overlayType, parent) {
-    this.parent = parent;
+  constructor(overlayType) {
     this.type = "tile overlay";
     this.overlayType = overlayType;
+    switch(overlayType) {
+      case "couchLeft":
+        this.sprite = images.overlays.moleHole.duplicate();
+        this.sprite.setActive(new Pair(0, 0));
+        break;
+      case "couchRight":
+        this.sprite = images.overlays.moleHole.duplicate();
+        this.sprite.setActive(new Pair(1, 0));
+        break;
+      }
   }
-  apply() {
+  attach(parentTile) {
+    this.parentTile = parentTile;
+    //nonwalkable overlays
+    this.parentTile.walkable = ["couchLeft", "couchRight"].includes(this.overlayType);
   }
   render() {
+    rt.renderImage(this.parentTile.transform, this.sprite);
   }
 }
 
@@ -102,7 +163,6 @@ class Level {
     this.visionRange = 5;
     this.levelId = levelId;
     this.zone = "";
-
     //assign zone
     if(this.levelId === 0) {
       this.zone = "The Mole Hill"
@@ -115,29 +175,29 @@ class Level {
     } else if(this.levelId >= 16) {
       this.zone = "The Mustelid Mafia"
     }
-
     //populate map with walls
     for(let i = 0; i < 50; i++) {
       this.map.push([]);
       for(let ii = 0; ii < 50; ii++) {
-        this.map[i][ii] = new Wall(new Pair((i - 25) * (tileSize - 1), (ii - 25) * (tileSize - 1)), new Pair(i, ii), images.tilesets.basic, this);
+        this.map[i][ii] = new Wall(new Pair((i - 25) * (tileSize - 1), (ii - 25) * (tileSize - 1)), new Pair(i, ii), images.tilesets.dirt, this);
       }
     }
     //molehill pre fall
     if(levelId === 0) {
-      tileMaps.moleHole.testRoom.stamp(this, new Pair(21, 21))
+      tileMaps.moleHole.pitRoom.stamp(this, new Pair(21, 21))
       this.playerSpawn = this.getIndex(new Pair(21, 21)).transform.duplicate();
     //buggy burrows
     } else {
       
     }
-    //reskin floor adjacent walls
+    //reskin floor adjacent walls and pits and attach overlays
     for(let i = 0; i < 50; i++) {
       for(let ii = 0; ii < 50; ii++) {
         let activeTile = this.map[i][ii];
-        if(activeTile.type === "wall") {
+        if(activeTile.type !== "floor") {
           activeTile.assignDirectionality();
         }
+        activeTile.attachOverlay()
       }
     }
   }
@@ -180,7 +240,7 @@ class Level {
   }
   getNonWalkables(client) {
     const retList = [];
-    //get friendlies that cant be walked on
+    //get entities that can't be walked on
     if(client.type !== "player" && client.type !== "level") {
       this.enemies.forEach((enemy) => {
         retList.push(enemy.tile.index.duplicate());
@@ -189,7 +249,7 @@ class Level {
     //get walls
     for(let ct = 0; ct < 2500; ct++) {
       let tObj = this.map[Math.floor(ct / 50)][ct % 50];
-      if(tObj.type === "wall") {
+      if(!tObj.walkable) {
         retList.push(tObj.index);
       }
     }
@@ -236,41 +296,58 @@ class Level {
 //ROOM TEMPLATES
 //room super class
 class Room {
-  constructor(w, h, entranceIndices, floorSprite, tileOverlays, tileMap) {
+  constructor(w, h, tileset, tileOverlays, tileMap) {
     [this.w, this.h] = [w, h];
-    this.entranceIndices = entranceIndices;
-    this.floorSprite = floorSprite;
+    this.tileset = tileset;
     this.tileOverlays = tileOverlays;
     this.tileMap = tileMap;
   }
   stamp(level, tlIndex) {
+    let entranceIndices = [];
     for(let i = 0; i < this.w; i++) {
       for(let ii = 0; ii < this.h; ii++) {
         let activeTile = level.map[tlIndex.y + i][tlIndex.x - ii];
-        if(this.tileMap[ii][i] === "f") {
-          level.map[tlIndex.y + i][tlIndex.x - ii] = new Floor(activeTile.transform.duplicate(), activeTile.index.duplicate(), this.floorSprite, level, null);
-        } else {
-          level.map[tlIndex.y + i][tlIndex.x - ii] = new Wall(activeTile.transform.duplicate(), activeTile.index.duplicate(), this.floorSprite, level, null);
-        }
+        switch(this.tileMap[ii][i]) {
+          case 'f':
+            level.map[tlIndex.y + i][tlIndex.x - ii] = new Floor(activeTile.transform.duplicate(), activeTile.index.duplicate(), this.tileset, level, null);
+            break;
+          case 'w':
+            level.map[tlIndex.y + i][tlIndex.x - ii] = new Wall(activeTile.transform.duplicate(), activeTile.index.duplicate(), this.tileset, level, null);
+            break;
+          case 'p':
+            level.map[tlIndex.y + i][tlIndex.x - ii] = new Pit(activeTile.transform.duplicate(), activeTile.index.duplicate(), this.tileset, level, null);
+            break;
+          case 'e':
+            level.map[tlIndex.y + i][tlIndex.x - ii] = new Floor(activeTile.transform.duplicate(), activeTile.index.duplicate(), this.tileset, level, null);
+            entranceIndices.push(activeTile.index.duplicate());
+            break;
+          }
       }
     }
     this.tileOverlays.forEach((overlayModule) => {
-      let targetTile = level.map[tlIndex.x + overlayModule.index.x][tlIndex.y + overlayModule.index.y];
+      let targetTile = level.map[tlIndex.x + overlayModule.index.x][tlIndex.y - overlayModule.index.y];
       targetTile.overlay = overlayModule.overlay;
-      targetTile.overlay.apply();
     });
+    return entranceIndices;
   }
 }
 
 const tileMaps = {
   moleHole: {
-    testRoom: new Room(5, 6, [], images.tilesets.basic, [], [
-      ['f','f','f','f','f'],
-      ['f','f','w','f','f'],
-      ['f','w','w','w','w'],
-      ['f','f','w','f','f'],
-      ['f','f','f','f','f'],
-      ['f','f','f','f','f']
-    ])
+    pitRoom: new Room(6, 4, images.tilesets.dirt, [
+      {
+        overlay: new TileOverlay("couchLeft"),
+        index: new Pair(1, 1)
+      },
+      {
+        overlay: new TileOverlay("couchRight"),
+        index: new Pair(2, 1)
+      }
+    ], [
+      ['f','f','f','f','f','f'],
+      ['f','f','f','f','p','p'],
+      ['f','f','f','f','p','p'],
+      ['f','f','e','f','f','f'],
+    ]),
   }
 }

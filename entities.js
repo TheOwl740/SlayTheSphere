@@ -15,7 +15,7 @@ class Player {
     this.forceMove = false;
     this.leftFacing = false;
     this.sprites = {
-      body: images.moles.marshallMole.body.duplicate()
+      body: images.moles.marshall.body.duplicate()
     }
     this.animation = {
       state: "idle",

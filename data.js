@@ -49,12 +49,15 @@ pixelFont.load().then((font) => {
 //images
 const images = {
   moles: {
-    marshallMole: {
-      body: new Sprite(tk.generateImage("Assets/Moles/MarshallMole/body.png"), 1, 0, 0, 0, 200, 200, false, false, 32, 32)
+    marshall: {
+      body: new Sprite(tk.generateImage("Assets/Moles/Marshall/body.png"), 1, 0, 0, 0, 200, 200, false, false, 32, 32)
     }
   },
   tilesets: {
-    basic: new Sprite(tk.generateImage("Assets/Tilesets/basic.png"), 1, 0, 0, 0, tileSize, tileSize, false, false, 32, 32)
+    dirt: new Sprite(tk.generateImage("Assets/Tilesets/dirt.png"), 1, 0, 0, 0, tileSize, tileSize, false, false, 32, 32)
+  },
+  overlays: {
+    moleHole: new Sprite(tk.generateImage("Assets/Overlays/moleHole.png"), 1, 0, 0, 0, tileSize, tileSize, false, false, 32, 32)
   }
 }
 
