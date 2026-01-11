@@ -21,9 +21,6 @@ class Wall extends Tile {
     this.walkable = false;
     this.sprite.setActive(new Pair(tk.randomNum(2, 3), 3));
     this.overlay = overlay;
-    if(overlay) {
-      overlay.apply()
-    }
   }
   render() {
     if(this.revealed) {
@@ -66,9 +63,6 @@ class Floor extends Tile {
     this.sprite.r = tk.randomNum(0, 3) * 90;
     this.sprite.setActive(new Pair(tk.randomNum(0, 1), tk.randomNum(0, 1)));
     this.overlay = overlay;
-    if(overlay) {
-      overlay.apply();
-    }
   }
   render() {
     if(this.revealed) {
@@ -131,9 +125,8 @@ class Level {
     }
     //molehill pre fall
     if(levelId === 0) {
-      //fill first room
-      drill(this.getIndex(new Pair(24, 24)), 50)
-      this.playerSpawn = this.getIndex(new Pair(24, 24)).transform.duplicate();
+      tileMaps.moleHole.testRoom.stamp(this, new Pair(21, 21))
+      this.playerSpawn = this.getIndex(new Pair(21, 21)).transform.duplicate();
     //buggy burrows
     } else {
       
@@ -243,17 +236,41 @@ class Level {
 //ROOM TEMPLATES
 //room super class
 class Room {
-  constructor(tlIndex, w, h, entranceIndices, tileMap) {
-    this.tlIndex = tlIndex;
+  constructor(w, h, entranceIndices, floorSprite, tileOverlays, tileMap) {
     [this.w, this.h] = [w, h];
     this.entranceIndices = entranceIndices;
+    this.floorSprite = floorSprite;
+    this.tileOverlays = tileOverlays;
     this.tileMap = tileMap;
   }
-  stamp(level) {
-
+  stamp(level, tlIndex) {
+    for(let i = 0; i < this.w; i++) {
+      for(let ii = 0; ii < this.h; ii++) {
+        let activeTile = level.map[tlIndex.y + i][tlIndex.x - ii];
+        if(this.tileMap[ii][i] === "f") {
+          level.map[tlIndex.y + i][tlIndex.x - ii] = new Floor(activeTile.transform.duplicate(), activeTile.index.duplicate(), this.floorSprite, level, null);
+        } else {
+          level.map[tlIndex.y + i][tlIndex.x - ii] = new Wall(activeTile.transform.duplicate(), activeTile.index.duplicate(), this.floorSprite, level, null);
+        }
+      }
+    }
+    this.tileOverlays.forEach((overlayModule) => {
+      let targetTile = level.map[tlIndex.x + overlayModule.index.x][tlIndex.y + overlayModule.index.y];
+      targetTile.overlay = overlayModule.overlay;
+      targetTile.overlay.apply();
+    });
   }
 }
 
 const tileMaps = {
-  
+  moleHole: {
+    testRoom: new Room(5, 6, [], images.tilesets.basic, [], [
+      ['f','f','f','f','f'],
+      ['f','f','w','f','f'],
+      ['f','w','w','w','w'],
+      ['f','f','w','f','f'],
+      ['f','f','f','f','f'],
+      ['f','f','f','f','f']
+    ])
+  }
 }
