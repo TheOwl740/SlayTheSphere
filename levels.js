@@ -138,12 +138,20 @@ class TileOverlay {
         this.sprite = images.overlays.moleHole.duplicate();
         this.sprite.setActive(new Pair(1, 0));
         break;
+      case "bedLeft":
+        this.sprite = images.overlays.moleHole.duplicate();
+        this.sprite.setActive(new Pair(0, 1));
+        break;
+      case "bedRight":
+        this.sprite = images.overlays.moleHole.duplicate();
+        this.sprite.setActive(new Pair(1, 1));
+        break;
       }
   }
   attach(parentTile) {
     this.parentTile = parentTile;
     //nonwalkable overlays
-    this.parentTile.walkable = ["couchLeft", "couchRight"].includes(this.overlayType);
+    this.parentTile.walkable = ["couchLeft", "couchRight", "bedLeft"].includes(this.overlayType);
   }
   render() {
     rt.renderImage(this.parentTile.transform, this.sprite);
@@ -184,7 +192,7 @@ class Level {
     }
     //molehill pre fall
     if(levelId === 0) {
-      tileMaps.moleHole.pitRoom.stamp(this, new Pair(21, 21))
+      tileMaps.moleHole.marshallsRoom.stamp(this, new Pair(21, 21))
       this.playerSpawn = this.getIndex(new Pair(21, 21)).transform.duplicate();
     //buggy burrows
     } else {
@@ -348,6 +356,20 @@ const tileMaps = {
       ['f','f','f','f','p','p'],
       ['f','f','f','f','p','p'],
       ['f','f','e','f','f','f'],
+    ]),
+    marshallsRoom: new Room(5, 3, images.tilesets.dirt, [
+      {
+        overlay: new TileOverlay("bedLeft"),
+        index: new Pair(3, 0)
+      },
+      {
+        overlay: new TileOverlay("bedRight"),
+        index: new Pair(4, 0)
+      }
+    ], [
+      ['f','e','f','f','f'],
+      ['f','f','f','f','f'],
+      ['f','f','f','f','f'],
     ]),
   }
 }
